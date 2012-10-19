@@ -13,7 +13,7 @@ use HTTP::Request;
 use LWP::UserAgent;
 use JSON;
 use Digest::MD5 qw( md5_base64);
-use Test::More tests => 45;
+use Test::More tests => 46;
 use Storable qw(dclone);
 use Test::Deep::NoTest qw(eq_deeply);
 use Data::Dumper;
@@ -34,10 +34,15 @@ sub testServer {
     while (my $c = $d->accept()) {
 	while (my $r = $c->get_request) {
 	    note( sprintf "Server: Recieved a connection: %s %s\n\t%s\n", $r->method, $r->url->path, $r->content);
-
+	    note( sprintf "        Authorization header: %s\n", $r->header('Authorization'));
 	    my $body = sprintf("You sent a %s for %s.\n\n",$r->method(), $r->url->path);
-	    my $token = $r->header('Authorization');
-	    $at->token( $token);
+	    my ($token) = $r->header('Authorization') =~ /OAuth (.+)/;
+	    
+	    if ($token) {
+		$at->token( $token);
+	    } else {
+		$at->{'token'} = undef;
+	    }
 	    note( "Server received request with token: ".$token);
 	    note( sprintf("Validation result on server side: %s", $at->validate() ? $at->validate() : 0 ));
 	    if ($at->validate()) {
@@ -60,25 +65,21 @@ sub testClient {
     my $server = shift;
 
     my $ua = LWP::UserAgent->new();
-    my $req = HTTP::Request->new( GET => $server. "someurl" );
-    ###
-    # AuthToken->new Test
-    ###
 
     ok( $at = Bio::KBase::AuthToken->new('user_id' => 'kbasetest', 'password' => '@Suite525'), "Logging in using papa account using username/password");
     ok($at->validate(), "Valid client token for user kbasetest");
-    $req->header("Authorization" => $at->token);
+    $ua->default_header( "Authorization" => "OAuth " . $at->token);
 
-    ok( $res = $ua->request( $req), "Submitting authenticated request to server");
+    ok( $res = $ua->get( $server."someurl"), "Submitting authenticated request to server");
     ok( ($res->code >= 200) && ($res->code < 300), "Querying server with token in Authorization header");
     note( sprintf "Client: Recieved a response: %d %s\n", $res->code, $res->content);
 
     # As a sanity check, trash the oauth_secret and make sure that
     # we get a negative result
-    $req->header("Authorization" => "bogo token");
+    $ua->default_header( "Authorization" => "BogoToken ");
 
-    note( sprintf "Client: Sending bad request: %s %s (expecting failure)\n",$req->method,$req->url->as_string);
-    $res = $ua->request( $req);
+    note( "Client: Sending bad request (expecting failure)\n");
+    ok( $res = $ua->get( $server."someurl"), "Submitting improperly authenticated request to server");
     ok( ($res->code < 200) || ($res->code >= 300), "Querying server with bad oauth creds, expected 401 error");
     note( sprintf "Client: Recieved a response: %d %s\n", $res->code, $res->content);
 

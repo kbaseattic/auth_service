@@ -5,6 +5,7 @@ use warnings;
 use JSON;
 use Bio::KBase::Auth;
 use LWP::UserAgent;
+use URI::URL;
 
 # We use Object::Tiny::RW to generate getters/setters for the attributes
 # and save ourselves some tedium
@@ -149,7 +150,7 @@ sub get {
 	unless ($user_id) {
 	    die "Failed to parse username from un= clause in token. Is the token legit?";
 	}
-	$path = sprintf('%s/%s?custom_fields=*',$path,$user_id);
+	$path = sprintf('%s/%s?custom_fields=*&fields=groups,username,email_validated,fullname,email',$path,$user_id);
 
 	# go_request will throw an error if it chokes and exit this eval block
 	my $nuser = $self->go_request( 'path' => $path, 'token' => $token);
@@ -164,6 +165,15 @@ sub get {
 	foreach my $x (keys %{$nuser->{'custom_fields'}}) {
 	    $self->{$x} = $nuser->{'custom_fields'}->{$x};
 	}
+
+	# The GO groups are not working yet, use internal groups 
+	my @groups = map { $_->{'name'}; } @{$nuser->{'groups'}};
+	 $self->{'groups'} = \@groups;
+	#my %groups = $self->roles_request();
+	#$self->{'groups'} = \%groups;
+
+
+
     };
     if ($@) {
 	$self->error_message("Failed to get profile: $@");
@@ -240,6 +250,57 @@ sub go_request {
 
 }
 
+#
+# Submit a request to the Roles service defined in
+# Bio::KBase::Auth::RolesSvcURL to fetch the roles that
+# a user is a member of. Returns a hash keyed on
+# role_id with values as simply 1
+#
+sub roles_request {
+    my $self = shift @_;
+    my %p = @_;
+
+    my %groups;
+    my $json;
+    eval {
+	my $baseurl = $Bio::KBase::Auth::RoleSvcURL;
+	my %headers;
+	unless ($p{'token'}) {
+	        $p{'token'} = $self->oauth_creds->{'auth_token'};
+	}
+	unless ($p{'token'}) {
+	    die "No authentication token";
+	}
+	$headers{'Authorization'} = 'OAuth ' . $p{'token'};
+	$headers{'Content-Type'} = 'application/json';
+	if (defined($p{'headers'})) {
+	    %headers = (%headers, %{$p{'headers'}});
+	}
+	my $headers = HTTP::Headers->new( %headers);
+    
+	my $client = LWP::UserAgent->new(default_headers => $headers);
+	$client->timeout(5);
+	$client->ssl_opts(verify_hostname => 0);
+	# URL params to return only the role_id's for this current user
+	my $url = url( $baseurl);
+	$url->query_form( filter => '{ "members" : "'.$self->user_id.'"}',
+			  fields => '{ "role_id" : "1" }');
+
+	my $response = $client->get( $url->as_string);
+	unless ($response->is_success) {
+	    die $response->status_line;
+	}
+	$json = decode_json( $response->content());
+	%groups = map { $_->{'role_id'} => 1 } @$json;
+    };
+    if ($@) {
+	die "Failed to query Globus Online: $@";
+    } else {
+	return( %groups);
+    }
+
+}
+
 sub _SquashJSONBool {
     # Walk an object ref returned by from_json() and squash references
     # to JSON::XS::Boolean into a simple 0 or 1
@@ -291,9 +352,9 @@ REQUIRED Identifier for the End-User at the Issuer.
 
 contains error messages, if any, from most recent method call
 
-=item B<groups> (string array)
+=item B<groups> (hashref)
 
-An array of strings for storing Unix style groups that the user is a member of
+A hash reference keyed on group names (value is simple 1) for storing Unix style groups that the user is a member of
 
 =item B<oauth_creds> (hash)
 

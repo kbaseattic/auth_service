@@ -1,0 +1,12 @@
+#!/bin/bash
+
+BASE=$(echo $0|sed 's/[^/]*$//')
+[ $BASE == '' ] && BASE='.'
+
+cd $BASE
+
+# Keep the configs for things in the django.conf file
+source ./django.conf
+
+kill $(cat $ABSBASE/var/service.pid)
+

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+BASE=$(echo $0|sed 's/[^/]*$//')
+[ "$BASE" == "" ] && BASE='.'
+
+cd $BASE
+
+# Keep the configs for things in the django.conf file
+source ./django.conf
+
+python authorization_server/manage.py runfcgi host=$FCGI_IP port=$FCGI_PORT pidfile=$ABSBASE/var/service.pid workdir=$(pwd) outlog=$ABSBASE/var/server.out errlog=$ABSBASE/var/server.err
+

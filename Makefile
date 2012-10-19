@@ -9,7 +9,11 @@ DEPLOY_PERL = $(addprefix $(TARGET)/bin/,$(basename $(notdir $(SRC_PERL))))
 TARGET ?= /kb/deployment
 KB_PERL_PATH = $(TARGET)
 
-all:
+SERVICE = authorization_server
+SERVICE_DIR = $(TARGET)/services/$(SERVICE)
+NGINX_CONF = /etc/nginx/conf.d/
+
+all: deploy deploy-services
 
 deploy: install-libs
 
@@ -23,3 +27,16 @@ install-libs:
 test-libs: install-libs
 	export PERL5LIB=$(KB_PERL_PATH) ; \
 	cd Bio-KBase-Auth; /kb/runtime/bin/perl ./Build test;
+
+deploy-nginx:
+	cp nginx.conf $(NGINX_CONF)/$(SERVICE).conf ; \
+	service nginx restart || echo "Already Up"
+
+deploy-services: deploy-nginx
+	mkdir -p $(SERVICE_DIR) ; \
+	rsync -avz --exclude .git --cvs-exclude authorization_server start_service stop_service django.conf var $(SERVICE_DIR) ; \
+	cd $(SERVICE_DIR)/$(SERVICE);echo no|python ./manage.py syncdb
+
+load-mongodb:
+	mongorestore -h mongodb.kbase.us --db authorization data/Roles-bootstrap/authorization
+
