@@ -2,29 +2,6 @@
 
 * External Package
 
-* Required Perl libs (install using cpan)
-    * Object::Tiny::RW
-    * JSON
-    * REST::Client
-    * Digest::SHA1
-    * Crypt::OpenSSL::RSA
-    * Crypt::OpenSSL::X509
-    * URI::Escape
-    * URI::QueryParam
-    * MIME::Base64
-    * HTTP::Request
-    * HTTP::Daemon
-    * LWP::UserAgent
-    * Net::OAuth
-    * URI::Escape
-    * Carp
-    * Data::Dumper
-    * Test::More
-    * Crypt::SSLeay
-    * Test::Deep::NoTest
-    * Storable
-    * Email::Valid
-
 * Required Python libs (install using easy_install or pip)
 
     * certifi==0.0.8
@@ -44,16 +21,6 @@
 * Ports that need to be open
 
 ### Google Doc for API
-
-   Perl libraries have built in perldocs. The authentication libraries use
-Globus Online's Nexus service for authentication. User accounts can be
-registered at:
-
-https://www.globusonline.org/SignUp
-
-   There is a developer tutorial at:
-
-http://www.kbase.us/developer-zone/tutorials/developer-tutorials/kbase-authentication/
 
    The initial documentation for the authorization service is here:
 

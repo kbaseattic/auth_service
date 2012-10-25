@@ -13,20 +13,9 @@ SERVICE = authorization_server
 SERVICE_DIR = $(TARGET)/services/$(SERVICE)
 NGINX_CONF = /etc/nginx/conf.d/
 
-all: deploy deploy-services
+all: deploy-services
 
-deploy: install-libs
-
-install-libs:
-	cd Bio-KBase-Auth; \
-	mkdir -p $(KB_PERL_PATH); \
-	/kb/runtime/bin/perl ./Build.PL ; \
-	/kb/runtime/bin/perl ./Build installdeps --install_base $(KB_PERL_PATH); \
-	/kb/runtime/bin/perl ./Build install --install_base $(KB_PERL_PATH) ;
-
-test-libs: install-libs
-	export PERL5LIB=$(KB_PERL_PATH) ; \
-	cd Bio-KBase-Auth; /kb/runtime/bin/perl ./Build test;
+deploy:
 
 deploy-nginx:
 	cp nginx.conf $(NGINX_CONF)/$(SERVICE).conf ; \
@@ -39,3 +28,4 @@ deploy-services: deploy-nginx
 
 load-mongodb:
 	mongorestore -h mongodb.kbase.us --db authorization data/Roles-bootstrap/authorization
+

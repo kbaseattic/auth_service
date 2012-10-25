@@ -107,6 +107,7 @@ class RoleHandler( BaseHandler):
     # Help object when queries go to the top level with no search specification
     help_json = { 'id' : 'KBase Authorization',
                   'documentation' : 'https://docs.google.com/document/d/1CTkthDUPwNzMF22maLyNIktI1sHdWPwtd3lJk0aFb20/edit',
+                  'documentation2' : 'https://docs.google.com/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit',
                   'resources' : { 'role_id' : 'Unique human readable identifer for role (required)',
                                   'description' : 'Description of the role (required)',
                                   'role_owner' : 'Owner(creator) of this role',
@@ -227,9 +228,15 @@ class RoleHandler( BaseHandler):
             old = self.roles.find_one( { 'role_id': role_id })
             if old != None:
                 if request.user.username == old['role_owner'] or request.user.username in old['role_updater'] :
-                    old.update(r)
-                    self.roles.save( old)
-                    res = rc.CREATED
+                    # only allow the role_owner to be updated by the role_owner
+                    if 'role_owner' in r and r['role_owner'] != old['role_owner'] and old['role_owner'] != request.user.username:
+                        res = rc.FORBIDDEN
+                        res.write( " %s role_owner can only be updated by %s, but request is from user %s" %
+                                   (old['role_id'],old['role_owner'], request.user.username))
+                    else:
+                        old.update(r)
+                        self.roles.save( old)
+                        res = rc.CREATED
                 else:
                     res = rc.FORBIDDEN
                     res.write( " %s is owned by %s and updated by %s, but request is from user %s" %

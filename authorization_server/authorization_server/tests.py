@@ -269,6 +269,15 @@ class RoleHandlerTest(TestCase):
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
         self.assertEqual(resp.status_code, 201, "Should accept update")
 
+
+        # try again but try to reset role_owner, should deny update
+        testdata3 = dict(testdata2)
+        testdata3['role_owner'] = "bugsbunny"
+        jdata3 = json.dumps(testdata3)
+        resp = h.put( url_roleid, jdata3, content_type="application/json",
+                     HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        self.assertEqual(resp.status_code, 401, "Should deny update of role_owner by non-owner")
+
         # pull record from the DB and make sure it is identical to what
         # we sent
         dbobj = self.roles.find( { 'role_id' : testdata2['role_id'] })
@@ -317,7 +326,6 @@ class RoleHandlerTest(TestCase):
         self.assertEqual(resp.status_code, 410, "Should reject delete for nonexistent role_id")
 
         resp = h.delete( url,{},HTTP_AUTHORIZATION="OAuth %s" % kbusertoken )
-        print "%d %s" % (resp.status_code,resp.content)
         self.assertEqual(resp.status_code, 204, "Should allow delete with kbasetest auth token")
 
         testdata['role_owner'] = "elmerfudd"

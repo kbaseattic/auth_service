@@ -12,6 +12,8 @@ urlpatterns = patterns('',
     # url(r'^authorization_server/', include('authorization_server.foo.urls')),
     url(r'^Roles/(?P<role_id>[^/]+)$','authorization_server.handlers.role_handler'),
     url(r'^Roles/?$','authorization_server.handlers.role_handler'),
+    url(r'^Sessions/?$','session.views.current_datetime'),
+    url(r'^Sessions/Login?$','session.views.login'),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),

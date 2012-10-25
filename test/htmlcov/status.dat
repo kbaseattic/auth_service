@@ -40,7 +40,7 @@ p20
 I0
 sS'n_statements'
 p21
-I148
+I151
 sS'n_excluded'
 p22
 I0
@@ -52,7 +52,7 @@ p24
 I0
 sbssS'hash'
 p25
-S'qz\xa6^C\x05>\x0e\xd9k^\x13\xe3\xed\x06\xe3'
+S'M<\x95\xf8J$\x82\x1aP:\xe8dOE?\xee'
 p26
 ssS'nexus_token_utils'
 p27
@@ -518,7 +518,7 @@ I1
 sg20
 I0
 sg21
-I215
+I219
 sg22
 I0
 sg23
@@ -526,7 +526,7 @@ I8
 sg24
 I0
 sbssg25
-S'\xd3\xbc \x99\x0b\x978\xbe\xd8\xe7\x85ZT\xfe\xc2\xcd'
+S' \xb9\x1d\x150\x8b\x91B\x80\xb90O\x10\x1f\xde\xe3'
 p136
 sssS'version'
 p137
