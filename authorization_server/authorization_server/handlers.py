@@ -139,10 +139,20 @@ class RoleHandler( BaseHandler):
     def check_kbase_user(self, user_id):
         try:
             res = self.roles.find_one( { 'role_id' : self.kbase_users,
-                                          'members' : user_id })
+                                         'members' : user_id })
             return res is not None
         except:
             return False
+
+    # Helper function that returns all the groups for a userid
+    def get_groups(self, user_id):
+        try:
+            roles = self.roles.find( { 'members' : user_id }, { 'role_id' : '1' })
+            res = [ roles[x]['role_id'] for x in range( roles.count()) ]
+            return res
+        except Exception, e:
+            logging.error( "Failed to fetch groups for user %s : %s" % ( user_id, e))
+            return []
 
     def read(self, request, role_id=None):
         try:

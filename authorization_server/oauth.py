@@ -101,7 +101,11 @@ class OAuth2Middleware(AuthenticationMiddleware):
 
 
     # Set the salt used for computing a session hash from the signature hash
-    salt = "(African || European)?"
+    try:
+        salt = settings.KBASE_SESSION_SALT
+    except:
+        logging.error("KBASE_SESSION_SALT has not been set in settings file. Using hard coded default.")
+        salt = "(African || European)?"
 
     def __init__(self, realm='API'):
         self.realm = realm
@@ -191,7 +195,7 @@ class OAuth2Middleware(AuthenticationMiddleware):
             for entry in token.split('|'):
                 key, value = entry.split('=')
                 token_map[key] = value
-            keyurl = self.__class__.authsvc + "/users/" + token_map['un'] + "?custom_fields=*"
+            keyurl = self.__class__.authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=groups,username,email_validated,fullname,email"
             res,body = self.http.request(keyurl,"GET",
                                          headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
             if (200 <= int(res.status)) and ( int(res.status) < 300):

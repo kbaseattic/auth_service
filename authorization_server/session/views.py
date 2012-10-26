@@ -5,10 +5,12 @@ import hashlib
 import json
 import base64
 import os
+import logging
+import pprint
 from django.http import HttpResponse
 from django.conf import settings
 from nexus import Client
-
+from authorization_server.handlers import RoleHandler
 # Authentication server
 # Create a Python Globus client
 client = Client(config_file=os.path.join(os.path.dirname(__file__), '../nexus/nexus.yml'))
@@ -19,9 +21,40 @@ except:
     authsvc = 'https://nexus.api.globusonline.org/'
 
 try:
+    rolessvc = settings.ROLES_SERVICE_URL
+except:
+    rolessvc = 'http://nexus.api.globusonline.org/'
+
+try:
     salt = settings.KBASE_SESSION_SALT
 except:
     raise Exception("KBASE_SESSION_SALT has not been set in settings file.")
+
+http = httplib2.Http(disable_ssl_certificate_validation=True)
+
+# Get an instance of the roles handlers so that we can use it to fetch role
+# information
+role_handler = RoleHandler()
+pp = pprint.PrettyPrinter(indent=4)
+
+def get_profile(token):
+    try:
+        token_map = {}
+        for entry in token.split('|'):
+            key, value = entry.split('=')
+            token_map[key] = value
+        keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=groups,username,email_validated,fullname,email"
+        res,body = http.request(keyurl,"GET",
+                                     headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
+        if (200 <= int(res.status)) and ( int(res.status) < 300):
+            profile = json.loads( body)
+            profile['groups'] = role_handler.get_groups( profile['username'])
+            return profile
+        logging.error( body)
+        raise Exception("HTTP", res)
+    except Exception, e:
+        logging.exception("Error in get_profile: %s" % e)
+        return None
 
 def get_nexus_token( url, user_id, password):
     h = httplib2.Http(disable_ssl_certificate_validation=True)
@@ -33,7 +66,6 @@ def get_nexus_token( url, user_id, password):
     
     resp, content = h.request(url, 'GET', headers=headers)
     status = int(resp['status'])
-    print "Resp = %s\nStatus = %d\nContent = %s\n" % (resp,status, content)
     tok = json.loads(content)
     if status>=200 and status<=299:
         return tok['access_token']
@@ -56,15 +88,18 @@ def login(request):
         url = authsvc + "goauth/token?grant_type=client_credentials"
         try:
             response['token'] = get_nexus_token( url, response['user_id'],password)
-            token = response['token']
             token_map = {}
             for entry in response['token'].split('|'):
                 key, value = entry.split('=')
                 token_map[key] = value
             response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
+            profile = get_profile(response['token'])
+            response.update(profile)
+            response.update(profile['custom_fields'])
+            del response['username']
+            del response['custom_fields']
         except Exception as e:
             response['error_msg'] = "%s" % e
-    print "%s" % response
     HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
     # Enable some basic CORS support
     HTTPres['Access-Control-Allow-Credentials'] = 'true'
