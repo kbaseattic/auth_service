@@ -21,11 +21,6 @@ except:
     authsvc = 'https://nexus.api.globusonline.org/'
 
 try:
-    rolessvc = settings.ROLES_SERVICE_URL
-except:
-    rolessvc = 'http://nexus.api.globusonline.org/'
-
-try:
     salt = settings.KBASE_SESSION_SALT
 except:
     raise Exception("KBASE_SESSION_SALT has not been set in settings file.")
