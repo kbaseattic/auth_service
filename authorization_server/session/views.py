@@ -91,7 +91,6 @@ def login(request):
             profile = get_profile(response['token'])
             response.update(profile)
             response.update(profile['custom_fields'])
-            del response['username']
             del response['custom_fields']
         except Exception as e:
             response['error_msg'] = "%s" % e
