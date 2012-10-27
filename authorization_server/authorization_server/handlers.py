@@ -99,6 +99,8 @@ class RoleHandler( BaseHandler):
         conn = Connection()
     db = conn.authorization
     roles = db.roles
+    roles.ensure_index( 'role_id', unique=True )
+    roles.ensure_index( 'members' )
     # Set the role_id to require for updates to the roles db
     try:
         kbase_users = settings.kbase_users
