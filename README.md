@@ -38,30 +38,40 @@ framework, so they can be run with "manage.py test authorization_server"
 0.  Start the VM and clone the git repo.
     nova boot .... (options will change over time)
     ssh ubuntu@<vm host>
-    git clone ssh://kbase@git.kbase.us/auth
-    cd auth
 
-1. As root do a make deploy. This will install the perl libraries
-   sudo -s
-   make deploy 
+1. Following an updated version of the directions
+   from: https://trac.kbase.us/projects/kbase/wiki/IntegrationTargets
+   sudo bash
+   cd /kb
+   git clone kbase@git.kbase.us:/dev_container.git
+   cd dev_container/modules
+   git clone kbase@git.kbase.us:/auth_service.git
+   cd ..
+   ./bootstrap /kb/runtime
+   . user-env.sh
 
-2. Run tests for the perl libraries
-   sudo make test-libs
+2. To configure the mongodb instance used to back the authorization service, create a
+   file named local_settings.py in
+   /kb/dev_container/modules/auth_service/authorization_server/authorization_server
+   If there is no local_settings file the service will default to the instance on mongodb.kbase.us,
+   however you will also need to set a salt value for the KBase session service, used to
+calculate a unique hash value for the session ID.
+   Here are recommended settings to put in the local_settings.py file:
+KBASE_SESSION_SALT = "(African || European)?"
+
+   If you want to use your own mongodb service running on localhost, you would add
+an extra setting:
+MONGODB_CONN = ['127.0.0.1:27017']
 
 3. The make target deploy-services will install and configure the authorization service
-   sudo make deploy-services
+   cd modules/auth_service
+   make deploy-services
 
-4. To configure the mongodb instance used to back the authorization service, create a
-file authorization_server/authorization_server/local_settings.py that declares which
-mongodb service to use. If there is no local_settings file the service will default to
-the instance on mongodb.kbase.us
-   If you need to set it to be something else, put something like this in your
-local_settings.py
-
-MONGODB_CONN = ['127.0.0.1']
+4. Run the internal unit tests
+   make test   
 
 5. If necessary, you can load the base/bootstrap authorization roles by using the "load-mongodb" target to initialize the mongodb service with a bare minimum set of roles. This is not necessary when working with the mongodb.kbase.us service.
-   sudo make load-mongodb
+   make load-mongodb
 
 6. The django server is started/stopped by using the start_service and stop_service
 scripts in /kb/deployment/services/authorization. Once you start the service, there
