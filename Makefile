@@ -26,6 +26,12 @@ deploy-services: deploy-nginx
 	rsync -avz --exclude .git --cvs-exclude authorization_server start_service stop_service django.conf var $(SERVICE_DIR) ; \
 	cd $(SERVICE_DIR)/$(SERVICE);echo no|python ./manage.py syncdb
 
+test: test_django
+
+test_django:
+	cd authorization_server; \
+	./manage.py test authorization_server
+
 load-mongodb:
 	mongorestore -h mongodb.kbase.us --db authorization data/Roles-bootstrap/authorization
 
