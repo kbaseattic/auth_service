@@ -26,7 +26,8 @@ except:
 try:
     salt = settings.KBASE_SESSION_SALT
 except:
-    raise Exception("KBASE_SESSION_SALT has not been set in settings file.")
+    logging.error("KBASE_SESSION_SALT not set in settings file, using hard coded default")
+    salt = "(African || European)?"
 
 http = httplib2.Http(disable_ssl_certificate_validation=True)
 
@@ -75,74 +76,111 @@ def get_profile(token):
         return None
 
 def get_nexus_token( url, user_id, password):
-    h = httplib2.Http(disable_ssl_certificate_validation=True)
-    auth = base64.encodestring( user_id + ':' + password )
-    headers = { 'Authorization' : 'Basic ' + auth }
+    try:
+        h = httplib2.Http(disable_ssl_certificate_validation=True)
+        auth = base64.encodestring( user_id + ':' + password )
+        headers = { 'Authorization' : 'Basic ' + auth }
+        
+        h.add_credentials(user_id, password)
+        h.follow_all_redirects = True
     
-    h.add_credentials(user_id, password)
-    h.follow_all_redirects = True
-    
-    resp, content = h.request(url, 'GET', headers=headers)
-    status = int(resp['status'])
-    tok = json.loads(content)
-    if status>=200 and status<=299:
-        return tok['access_token']
-    else:
-        raise Exception(tok['message'])
+        resp, content = h.request(url, 'GET', headers=headers)
+        status = int(resp['status'])
+        tok = json.loads(content)
+        if status>=200 and status<=299:
+            return tok['access_token']
+        else:
+            raise Exception(tok['message'])
+    except Exception, e:
+        logging.error( "Error while fetching nexus token: %e" % e)
+        return(None)
 
 def current_datetime(request):
     now = datetime.datetime.now()
     html = "<html><body>It is now %s.</body></html>" % now
     return HttpResponse(html)
 
-def login(request):
-    response = {
-        'user_id' : request.REQUEST.get('user_id'),
-        }
-    password = request.REQUEST.get('password')
-    cookie = request.REQUEST.get('cookie')
-    # Session lifetime for mongodb sessions. Default set in settings file
-    lifetime = request.REQUEST.get('lifetime',session_lifetime)
-    if (response['user_id'] is not None and password is not None):
-        url = authsvc + "goauth/token?grant_type=client_credentials"
-        try:
-            response['token'] = get_nexus_token( url, response['user_id'],password)
-            token_map = {}
-            for entry in response['token'].split('|'):
-                key, value = entry.split('=')
-                token_map[key] = value
-            response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
-            profile = get_profile(response['token'])
-            response.update(profile)
-            response.update(profile['custom_fields'])
-            del response['custom_fields']
-        except Exception as e:
-            response['error_msg'] = "%s" % e
-    else:
-        response['error_msg'] = "Must specify user_id and password"
-    if cookie == "only":
-        HTTPres = HttpResponse()
-    else:
-        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
-    # Push the session into the database if there was a sessionid generated
-    if 'kbase_sessionid' in response:
-        response['creation'] = datetime.now()
-        response['expiration'] = datetime.now() + timedelta(seconds = lifetime)
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            response['client_ip'] = x_forwarded_for.split(',')[-1].strip()
-        else:
-            response['client_ip'] = request.META.get('REMOTE_ADDR')
-        sessiondb.insert(response)
-    # Enable some basic CORS support
-    HTTPres['Access-Control-Allow-Credentials'] = 'true'
+def exists(request):
     try:
-        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
-    except Exception as e:
-        HTTPres['Access-Control-Allow-Origin'] = "*"
-    # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
-    if cookie is not None and 'kbase_sessionid' in response:
-        cookie = "un=%s|kbase_sessionid=%s" % (response['user_id'],response['kbase_sessionid'])
-        HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
-        HTTPres.set_cookie( 'kbase_session', cookie)
+        response = {}
+        session_id = request.REQUEST.get('kbase_sessionid')
+        client_ip = request.REQUEST.get('client_ip')
+        if session_id is None or client_ip is None:
+            response['error_msg'] = "Require kbase_sessionid and client_ip as parameters"
+            retcode = 400
+        else:
+            res = sessiondb.find_one( { 'kbase_sessionid' : session_id,
+                                        'client_ip' : client_ip,
+                                        'expiration' : { '$gte' : datetime.now() }})
+            if res is not None:
+                response['expiration'] = "%s" % res['expiration']
+                retcode = 200
+            else:
+                response['error_msg'] = "No session found"
+                retcode = 404
+        # Expire old sessions
+        sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
+    except Exception, e:
+        error = "Error checking existence of session: %s" % e
+        logging.error( error)
+        response['error_msg'] = error
+        retcode = 500
+    return HttpResponse( json.dumps(response), mimetype="application/json", status = retcode)
+        
+        
+
+def login(request):
+    try:
+        response = {
+            'user_id' : request.POST.get('user_id'),
+            }
+        password = request.POST.get('password')
+        cookie = request.POST.get('cookie')
+        # Session lifetime for mongodb sessions. Default set in settings file
+        lifetime = request.POST.get('lifetime',session_lifetime)
+        if (response['user_id'] is not None and password is not None):
+            url = authsvc + "goauth/token?grant_type=client_credentials"
+            try:
+                response['token'] = get_nexus_token( url, response['user_id'],password)
+                token_map = {}
+                for entry in response['token'].split('|'):
+                    key, value = entry.split('=')
+                    token_map[key] = value
+                response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
+                profile = get_profile(response['token'])
+                response.update(profile)
+                response.update(profile['custom_fields'])
+                del response['custom_fields']
+            except Exception as e:
+                response['error_msg'] = "%s" % e
+        else:
+            response['error_msg'] = "Must specify user_id and password in POST message body"
+        if cookie == "only":
+            HTTPres = HttpResponse()
+        else:
+            HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
+        # Push the session into the database if there was a sessionid generated
+        if 'kbase_sessionid' in response:
+            response['creation'] = datetime.now()
+            response['expiration'] = datetime.now() + timedelta(seconds = lifetime)
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                response['client_ip'] = x_forwarded_for.split(',')[-1].strip()
+            else:
+                response['client_ip'] = request.META.get('REMOTE_ADDR')
+            sessiondb.insert(response)
+        # Enable some basic CORS support
+        HTTPres['Access-Control-Allow-Credentials'] = 'true'
+        try:
+            HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+        except Exception as e:
+            HTTPres['Access-Control-Allow-Origin'] = "*"
+        # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
+        if cookie is not None and 'kbase_sessionid' in response:
+            cookie = "un=%s|kbase_sessionid=%s" % (response['user_id'],response['kbase_sessionid'])
+            HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
+            HTTPres.set_cookie( 'kbase_session', cookie)
+    except Exception, e:
+        response['error_msg'] = "%s" % e
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
     return HTTPres
