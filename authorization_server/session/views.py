@@ -7,9 +7,12 @@ import base64
 import os
 import logging
 import pprint
+import rsa
+from datetime import datetime,timedelta
 from django.http import HttpResponse
 from django.conf import settings
 from nexus import Client
+from pymongo import Connection
 from authorization_server.handlers import RoleHandler
 # Authentication server
 # Create a Python Globus client
@@ -31,6 +34,26 @@ http = httplib2.Http(disable_ssl_certificate_validation=True)
 # information
 role_handler = RoleHandler()
 pp = pprint.PrettyPrinter(indent=4)
+
+# Setup MongoDB connection
+try:
+    conn = Connection(settings.MONGODB_CONN)
+except AttributeError as e:
+    print "No connection settings specified: %s\n" % e
+    conn = Connection(['mongodb.kbase.us'])
+except Exception as e:
+    print "Generic exception %s: %s\n" % (type(e),e)
+    conn = Connection()
+db = conn.authorization
+sessiondb = db.sessions
+sessiondb.ensure_index('kbase_sessionid')
+
+# Default session lifetime in seconds from settings file
+# otherwise default to 1 hour
+try:
+    session_lifetime = settings.SESSION_DB_LIFETIME
+except:
+    session_lifetime = 3600
 
 def get_profile(token):
     try:
@@ -66,8 +89,6 @@ def get_nexus_token( url, user_id, password):
         return tok['access_token']
     else:
         raise Exception(tok['message'])
-        
-    
 
 def current_datetime(request):
     now = datetime.datetime.now()
@@ -79,6 +100,9 @@ def login(request):
         'user_id' : request.REQUEST.get('user_id'),
         }
     password = request.REQUEST.get('password')
+    cookie = request.REQUEST.get('cookie')
+    # Session lifetime for mongodb sessions. Default set in settings file
+    lifetime = request.REQUEST.get('lifetime',session_lifetime)
     if (response['user_id'] is not None and password is not None):
         url = authsvc + "goauth/token?grant_type=client_credentials"
         try:
@@ -94,11 +118,31 @@ def login(request):
             del response['custom_fields']
         except Exception as e:
             response['error_msg'] = "%s" % e
-    HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
+    else:
+        response['error_msg'] = "Must specify user_id and password"
+    if cookie == "only":
+        HTTPres = HttpResponse()
+    else:
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
+    # Push the session into the database if there was a sessionid generated
+    if 'kbase_sessionid' in response:
+        response['creation'] = datetime.now()
+        response['expiration'] = datetime.now() + timedelta(seconds = lifetime)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            response['client_ip'] = x_forwarded_for.split(',')[-1].strip()
+        else:
+            response['client_ip'] = request.META.get('REMOTE_ADDR')
+        sessiondb.insert(response)
     # Enable some basic CORS support
     HTTPres['Access-Control-Allow-Credentials'] = 'true'
     try:
         HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
     except Exception as e:
         HTTPres['Access-Control-Allow-Origin'] = "*"
+    # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
+    if cookie is not None and 'kbase_sessionid' in response:
+        cookie = "un=%s|kbase_sessionid=%s" % (response['user_id'],response['kbase_sessionid'])
+        HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
+        HTTPres.set_cookie( 'kbase_session', cookie)
     return HTTPres

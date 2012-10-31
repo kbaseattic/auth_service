@@ -218,4 +218,11 @@ def AuthStatus(request):
             res = res + "Your profile record is:\n%s\n" % pformat( request.META['KBASEprofile'])
         if 'KBASEtoken' in request.META:
             res = res + "Your OAuth token is:\n%s\n" % pformat( request.META['KBASEtoken'])
-    return HttpResponse(res)
+    HTTPres = HttpResponse(res)
+    HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    HTTPres['Access-Control-Allow-Headers'] = 'authorization'
+    try:
+        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+    except Exception as e:
+        HTTPres['Access-Control-Allow-Origin'] = "*"
+    return HTTPres
