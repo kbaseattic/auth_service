@@ -76,24 +76,20 @@ def get_profile(token):
         return None
 
 def get_nexus_token( url, user_id, password):
-    try:
-        h = httplib2.Http(disable_ssl_certificate_validation=True)
-        auth = base64.encodestring( user_id + ':' + password )
-        headers = { 'Authorization' : 'Basic ' + auth }
-        
-        h.add_credentials(user_id, password)
-        h.follow_all_redirects = True
+    h = httplib2.Http(disable_ssl_certificate_validation=True)
+    auth = base64.encodestring( user_id + ':' + password )
+    headers = { 'Authorization' : 'Basic ' + auth }
     
-        resp, content = h.request(url, 'GET', headers=headers)
-        status = int(resp['status'])
-        tok = json.loads(content)
-        if status>=200 and status<=299:
-            return tok['access_token']
-        else:
-            raise Exception(tok['message'])
-    except Exception, e:
-        logging.error( "Error while fetching nexus token: %e" % e)
-        return(None)
+    h.add_credentials(user_id, password)
+    h.follow_all_redirects = True
+    
+    resp, content = h.request(url, 'GET', headers=headers)
+    status = int(resp['status'])
+    tok = json.loads(content)
+    if status>=200 and status<=299:
+        return tok['access_token']
+    else:
+        raise Exception(tok['message'])
 
 def current_datetime(request):
     now = datetime.now()
