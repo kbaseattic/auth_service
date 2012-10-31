@@ -105,7 +105,6 @@ def exists(request):
         response = {}
         session_id = request.REQUEST.get('kbase_sessionid')
         client_ip = request.REQUEST.get('client_ip')
-        print pp.pformat( request.GET.items)
         if session_id is None or client_ip is None:
             response['error_msg'] = "Require kbase_sessionid and client_ip as parameters"
             retcode = 400
@@ -119,6 +118,8 @@ def exists(request):
             else:
                 response['error_msg'] = "No session found"
                 retcode = 404
+        # Expire old sessions
+        sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
     except Exception, e:
         error = "Error checking existence of session: %s" % e
         logging.error( error)
@@ -131,12 +132,12 @@ def exists(request):
 def login(request):
     try:
         response = {
-            'user_id' : request.REQUEST.get('user_id'),
+            'user_id' : request.POST.get('user_id'),
             }
-        password = request.REQUEST.get('password')
-        cookie = request.REQUEST.get('cookie')
+        password = request.POST.get('password')
+        cookie = request.POST.get('cookie')
         # Session lifetime for mongodb sessions. Default set in settings file
-        lifetime = request.REQUEST.get('lifetime',session_lifetime)
+        lifetime = request.POST.get('lifetime',session_lifetime)
         if (response['user_id'] is not None and password is not None):
             url = authsvc + "goauth/token?grant_type=client_credentials"
             try:
@@ -153,7 +154,7 @@ def login(request):
             except Exception as e:
                 response['error_msg'] = "%s" % e
         else:
-            response['error_msg'] = "Must specify user_id and password"
+            response['error_msg'] = "Must specify user_id and password in POST message body"
         if cookie == "only":
             HTTPres = HttpResponse()
         else:
