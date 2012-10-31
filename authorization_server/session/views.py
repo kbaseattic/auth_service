@@ -169,6 +169,9 @@ def login(request):
             else:
                 response['client_ip'] = request.META.get('REMOTE_ADDR')
             sessiondb.insert(response)
+            # Expire old sessions
+            sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
+
         # Enable some basic CORS support
         HTTPres['Access-Control-Allow-Credentials'] = 'true'
         try:
