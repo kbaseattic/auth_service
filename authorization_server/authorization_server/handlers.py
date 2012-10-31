@@ -96,7 +96,7 @@ class RoleHandler( BaseHandler):
         conn = Connection(['mongodb.kbase.us'])
     except Exception as e:
         print "Generic exception %s: %s\n" % (type(e),e)
-        conn = Connection()
+        conn = Connection(['mongodb.kbase.us'])
     db = conn.authorization
     roles = db.roles
     roles.ensure_index( 'role_id', unique=True )

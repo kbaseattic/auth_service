@@ -44,7 +44,7 @@ except AttributeError as e:
     conn = Connection(['mongodb.kbase.us'])
 except Exception as e:
     print "Generic exception %s: %s\n" % (type(e),e)
-    conn = Connection()
+    conn = Connection(['mongodb.kbase.us'])
 db = conn.authorization
 sessiondb = db.sessions
 sessiondb.ensure_index('kbase_sessionid')
@@ -169,6 +169,9 @@ def login(request):
             else:
                 response['client_ip'] = request.META.get('REMOTE_ADDR')
             sessiondb.insert(response)
+            # Expire old sessions
+            sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
+
         # Enable some basic CORS support
         HTTPres['Access-Control-Allow-Credentials'] = 'true'
         try:
