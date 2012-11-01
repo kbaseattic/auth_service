@@ -7,8 +7,8 @@ DJANGO_ROOT = os.path.dirname(os.path.realpath(django.__file__))
 
 # Django settings for authorization_server project.
 
-DEBUG = True
-TEMPLATE_DEBUG = DEBUG
+#DEBUG = True
+#TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
