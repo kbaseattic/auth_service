@@ -76,7 +76,7 @@ with an FCGI listener on port 7039 ( for production deployment )
    The make target deploy-test-services will install and configure the service with an
 nginx http listener on port 7039 so that you can directly query the service for testing
    cd modules/auth_service
-   make deploy-auth-services
+   make deploy-test-services
 
 4. Run the internal unit tests
    make test   
