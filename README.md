@@ -22,16 +22,21 @@
 
 ### Google Doc for API
 
-   The initial documentation for the authorization service is here:
+   The original design documentation for the authorization service is here:
 
 https://docs.google.com/document/d/1CTkthDUPwNzMF22maLyNIktI1sHdWPwtd3lJk0aFb20/edit
+
+   The documentation for the actual implementation is here:
+https://docs.google.com/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit
 
    Going to http://{authorization.host}/Roles?about will being up a JSON document that
 gives a description of the service.
    The file authorization_service/authorization_service/handlers.py implements the
 REST service, and had a largish comment at the top explaining how it works.
    Unittests for the authz service have been implemented using the Django unittest
-framework, so they can be run with "manage.py test authorization_server"
+framework, they are available in the Makefile target "test", so they can be run
+by "make test" or you can go to the django site root and run it directly using
+"manage.py test authorization_server"
 
 ### Setup using the kbase VMs
 =======
@@ -40,7 +45,7 @@ framework, so they can be run with "manage.py test authorization_server"
     ssh ubuntu@<vm host>
 
 1. Following an updated version of the directions
-   from: https://trac.kbase.us/projects/kbase/wiki/IntegrationTargets
+from: https://trac.kbase.us/projects/kbase/wiki/IntegrationTargets
    sudo bash
    cd /kb
    git clone kbase@git.kbase.us:/dev_container.git
@@ -51,7 +56,7 @@ framework, so they can be run with "manage.py test authorization_server"
    . user-env.sh
 
 2. To configure the mongodb instance used to back the authorization service, create a
-   file named local_settings.py in
+file named local_settings.py in
    /kb/dev_container/modules/auth_service/authorization_server/authorization_server
    If there is no local_settings file the service will default to the instance on mongodb.kbase.us,
    however you will also need to set a salt value for the KBase session service, used to
@@ -64,8 +69,14 @@ an extra setting:
 MONGODB_CONN = ['127.0.0.1:27017']
 
 3. The make target deploy-services will install and configure the authorization service
+with an FCGI listener on port 7039 ( for production deployment )
    cd modules/auth_service
    make deploy-services
+
+   The make target deploy-test-services will install and configure the service with an
+nginx http listener on port 7039 so that you can directly query the service for testing
+   cd modules/auth_service
+   make deploy-auth-services
 
 4. Run the internal unit tests
    make test   
@@ -75,8 +86,10 @@ MONGODB_CONN = ['127.0.0.1:27017']
 
 6. The django server is started/stopped by using the start_service and stop_service
 scripts in /kb/deployment/services/authorization. Once you start the service, there
-will be a listener at http://hostname:7039/ with the authorization service responding
-under the /Roles/ url. You will need to access it with a KBase token to get any
+will be an FCGI listener at hostname:7039 with the authorization service responding
+under the /Roles/ url. Use the deploy-test-services make target to get an http
+listener on that port instance (assumed for the examples that follow).
+    You will need to access it with a KBase token to get any
 real data back:
 
 root@sychan-temp2:/kb/deployment/services/authorization_server# ./start_service 

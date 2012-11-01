@@ -12,7 +12,7 @@ urlpatterns = patterns('',
     # url(r'^authorization_server/', include('authorization_server.foo.urls')),
     url(r'^Roles/(?P<role_id>[^/]+)$','authorization_server.handlers.role_handler'),
     url(r'^Roles/?$','authorization_server.handlers.role_handler'),
-    url(r'^Sessions/?$','session.views.current_datetime'),
+    url(r'^Sessions/?$','session.views.show_login_screen'),
     url(r'^Sessions/Login?$','session.views.login'),
     url(r'^Sessions/Exists?$','session.views.exists'),
 

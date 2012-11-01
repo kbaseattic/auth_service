@@ -8,6 +8,7 @@ import os
 import logging
 import pprint
 import rsa
+import django.template
 from datetime import datetime,timedelta
 from django.http import HttpResponse
 from django.conf import settings
@@ -95,6 +96,10 @@ def current_datetime(request):
     now = datetime.now()
     html = "<html><body>It is now %s.</body></html>" % now
     return HttpResponse(html)
+
+def show_login_screen(request):
+    login_screen = django.template.loader.render_to_string('login.html',{})
+    return HttpResponse( login_screen)
 
 def exists(request):
     try:
