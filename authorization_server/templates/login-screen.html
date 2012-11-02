@@ -9,6 +9,18 @@
 
         <script type = 'text/javascript'>
             <!--
+		var callback = function(success, args) {
+
+                                        if ( success ) {
+                                            $(this).trigger('clearMessages');
+                                            $("#login-loggedinusername").text(args.username);
+                                            $("#login-loggedinsession").text(args.kbase_sessionid);
+                                            $("#login-userdisplay").show();
+                                        }
+                                        else {
+                                            $(this).trigger('error', args.message);
+                                        }
+                                    };
                 $(function() {
 
                     var $ld = $("#login-dialog");
@@ -33,7 +45,6 @@
 
                                         if ( success ) {
                                             $(this).trigger('clearMessages');
-                                            $("#login-entrance").hide();
                                             $("#login-loggedinusername").text(args.username);
                                             $("#login-loggedinsession").text(args.kbase_sessionid);
                                             $("#login-userdisplay").show();
@@ -79,6 +90,7 @@
 
                     $( "#login-widget button" ).button();
 
+		    login_entry();
                 });
 
             function login(username, password, callback) {
@@ -148,7 +160,6 @@
 					  var cookie = '';
 			                  // Look for a kbase_session cookie
 					  var i,x,y,ARRcookies=document.cookie.split(";");
-					  alert( document.cookie);
 					  for (i=0;i<ARRcookies.length;i++) {
 					      x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
 					      y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
@@ -191,16 +202,49 @@
 
                 // STEVE -
                 // do whatever you need to do here to log the user out of the system
-
+		date = new Date();
+		date.setDate(date.getDate() -1);
+		cookie = 'kbase_session=; domain=.kbase.us; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+		document.cookie = cookie;
 
                 // END STEVE
 
                 // the rest of this is just housekeeping.
                 $("#login-userdisplay").hide();
-                $("#login-entrance").show();
 
                 //automatically prompt to log in again
                 $('#login-dialog').dialog('open');
+            }
+
+            function get_kbase_cookie() {
+	        var cookie = '';
+		var args = {};
+
+		// Look for a kbase_session cookie
+		var i,x,y,ARRcookies=document.cookie.split(";");
+		for (i=0;i<ARRcookies.length;i++) {
+		    x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
+		    y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
+		    x=x.replace(/^\s+|\s+$/g,"");
+		    if (x=='kbase_session') {
+		        cookie = unescape(y);
+			}
+		}
+	        var m = /un=(\w+)\|kbase_sessionid=(\w+)/g.exec( cookie );
+		if (m) {
+		    args.username = m[1];
+		    args.kbase_sessionid = m[2];
+		}
+		return( args);
+            }
+
+            function login_entry() {
+	        var args=get_kbase_cookie();
+		if ( 'username' in args ) {
+		    callback( 1, args);
+		} else {
+	            $('#login-dialog').dialog('open');
+		}
             }
 
             //-->
@@ -231,11 +275,6 @@
         <div class = 'ui-widget' id = 'login-widget'>
             <div class = "ui-widget-content ui-corner-all" style = 'width : 250px;'>
                 <h3 class="ui-widget-header ui-corner-all" style = 'padding : 5px; margin-top : 0px '>User</h3>
-                <div id = 'login-entrance'>
-                    <p style = 'text-align : center'>
-                        <button id = 'login-loginbutton' onclick = "$('#login-dialog').dialog('open')">Login</button>
-                    </p>
-                </div>
                 <div id = 'login-userdisplay' style = 'display : none;'>
                     <p style = 'text-align : center'>
                         Logged in as <span id = 'login-loggedinusername' style = 'font-weight : bold'>Username</span><br/>

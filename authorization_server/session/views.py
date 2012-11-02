@@ -98,7 +98,7 @@ def current_datetime(request):
     return HttpResponse(html)
 
 def show_login_screen(request):
-    login_screen = django.template.loader.render_to_string('login.html',{})
+    login_screen = django.template.loader.render_to_string('login-screen.html',{})
     return HttpResponse( login_screen)
 
 def exists(request):
