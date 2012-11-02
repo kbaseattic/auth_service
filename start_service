@@ -12,7 +12,7 @@ PIDFILE=$ABSBASE/var/service.pid
 
 if [ -e $PIDFILE ]; then
    PID=$(cat $PIDFILE)
-   ps -p $PID | grep $PID
+   TMP=$(ps -p $PID | grep $PID)
    # If it showed up in the PS output, then it is already up
    if [ $? = "0" ]; then
     echo "Service already running"
@@ -20,5 +20,5 @@ if [ -e $PIDFILE ]; then
    fi
 fi
 
-python authorization_server/manage.py runfcgi host=$FCGI_IP port=$FCGI_PORT pidfile=$pidfile workdir=$(pwd) outlog=$ABSBASE/var/server.out errlog=$ABSBASE/var/server.err
+python authorization_server/manage.py runfcgi host=$FCGI_IP port=$FCGI_PORT pidfile=$PIDFILE workdir=$(pwd) outlog=$ABSBASE/var/server.out errlog=$ABSBASE/var/server.err
 
