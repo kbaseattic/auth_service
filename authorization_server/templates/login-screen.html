@@ -14,7 +14,6 @@
                                         if ( success ) {
                                             $(this).trigger('clearMessages');
                                             $("#login-loggedinusername").text(args.username);
-                                            $("#login-loggedinsession").text(args.kbase_sessionid);
                                             $("#login-userdisplay").show();
                                         }
                                         else {
@@ -24,7 +23,6 @@
                 $(function() {
 
                     var $ld = $("#login-dialog");
-
                     $ld.dialog(
                         {
                             autoOpen : false,
@@ -44,11 +42,14 @@
                                     login.call(this, username, password, function(success, args) {
 
                                         if ( success ) {
+					    {% if return_url %}
+					    window.location.href = '{{return_url}}';
+					    {% else %}
                                             $(this).trigger('clearMessages');
                                             $("#login-loggedinusername").text(args.username);
-                                            $("#login-loggedinsession").text(args.kbase_sessionid);
                                             $("#login-userdisplay").show();
                                             $(this).dialog('close');
+					    {% endif %}
                                         }
                                         else {
                                             $(this).trigger('error', args.message);
@@ -135,18 +136,6 @@
                 // start filling in the real code here.
 
                 // END STEVE
-		/*
-                if (logindemo) {
-                    if (status && Math.random() < 0.5) {
-                        status = 0;
-                        args.message = 'Unlucky this time - Try again.';
-                    }
-                    var that = this;
-                    setTimeout(function() { callback.call(that, status, args) }, 1000);
-                } else {
-                    callback.call(this, status, args);
-                }
-		*/
                     $.ajax({ type: "POST",
 		             url: "https://www.kbase.us/services/authorization/Sessions/Login",
 			     data : { 'user_id' : username,
@@ -263,7 +252,6 @@
                 clear : left;
                 text-align : right;
             }
-
 		</style>
 
     </head>
@@ -273,12 +261,12 @@
 
         <!-- begin login widget -->
         <div class = 'ui-widget' id = 'login-widget'>
-            <div class = "ui-widget-content ui-corner-all" style = 'width : 250px;'>
-                <h3 class="ui-widget-header ui-corner-all" style = 'padding : 5px; margin-top : 0px '>User</h3>
+            <div class = "ui-widget-content ui-corner-all" style = 'border : 0px; '>
+
                 <div id = 'login-userdisplay' style = 'display : none;'>
                     <p style = 'text-align : center'>
                         Logged in as <span id = 'login-loggedinusername' style = 'font-weight : bold'>Username</span><br/>
-                        Session ID: <span id = 'login-loggedinsession' style = 'font-weight : bold'>Session ID</span><br/>
+			{% if return_url %}<button id = 'login-return_url' onclick = "window.location.href = '{{return_url}}';">Return to Site</button>	{% endif %}
                         <button id = 'login-logoutbutton' onclick = "logout()">Logout</button>
                     </p>
                 </div>
