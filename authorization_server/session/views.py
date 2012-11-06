@@ -9,13 +9,16 @@ import logging
 import pprint
 import rsa
 import django.template
+import re
 from datetime import datetime,timedelta
 from django.http import HttpResponse
 from django.conf import settings
 from nexus import Client
 from pymongo import Connection
 from authorization_server.handlers import RoleHandler
+
 # Authentication server
+
 # Create a Python Globus client
 client = Client(config_file=os.path.join(os.path.dirname(__file__), '../nexus/nexus.yml'))
 
@@ -35,7 +38,11 @@ http = httplib2.Http(disable_ssl_certificate_validation=True)
 # Get an instance of the roles handlers so that we can use it to fetch role
 # information
 role_handler = RoleHandler()
+
 pp = pprint.PrettyPrinter(indent=4)
+
+# regex for parsing session cookies
+cookie_re = re.compile(r"un=(\w+)\|kbase_sessionid=(\w+)")
 
 # Setup MongoDB connection
 try:
@@ -65,7 +72,7 @@ def get_profile(token):
             token_map[key] = value
         keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=groups,username,email_validated,fullname,email"
         res,body = http.request(keyurl,"GET",
-                                     headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
+                                headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
         if (200 <= int(res.status)) and ( int(res.status) < 300):
             profile = json.loads( body)
             profile['groups'] = role_handler.get_groups( profile['username'])
@@ -112,8 +119,8 @@ def login_js(request):
         scheme = 'https://'
     else:
         scheme = 'http://'
-    base_url = '%s%s' % (scheme, request.get_host())
-
+    print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
+    base_url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
     
     if return_url is not None:
         login_js = django.template.loader.render_to_string('login-dialog.js',
@@ -121,7 +128,12 @@ def login_js(request):
                                                              'base_url' : base_url })
     else:
         login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
-    return HttpResponse( login_js, content_type = "text/javascript")
+    HTTPres = HttpResponse( login_js, content_type = "text/javascript")
+    try:
+        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+    except Exception as e:
+        HTTPres['Access-Control-Allow-Origin'] = "*"
+    return HTTPres
 
 def login_form(request):
     login_form = django.template.loader.render_to_string('login-form.html',{})
@@ -162,8 +174,42 @@ def exists(request):
         retcode = 500
     return HttpResponse( json.dumps(response), mimetype="application/json", status = retcode)
         
-        
+def logout(request):
+    try:
+        cookie = request.COOKIES.get('kbase_session')
+        if cookie is None:
+            raise Exception( 'kbase_session cookie required for logout')
+        try:
+            (username,kbase_sessionid) = cookie_re.match(cookie).groups()
+        except:
+            raise Exception( 'invalid kbase_session cookie')
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            client_ip = x_forwarded_for.split(',')[-1].strip()
+        else:
+            client_ip = request.META.get('REMOTE_ADDR')
+        res = sessiondb.find_one( { 'kbase_sessionid' : kbase_sessionid,
+                                    'client_ip' : client_ip,
+                                    'username' : username })
+        if res is not None:
+            sessiondb.remove( res)
+            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
+                                    mimetype="application/json")
+            cookie = "un=%s|kbase_sessionid=%s" % (username,kbase_sessionid)
+            HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us",expires='Thu, 01 Jan 1970 00:00:01 GMT')
 
+        else:
+            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
+                                    mimetype="application/json",status=404)
+    except Exception, e:
+        HTTPres = HttpResponse( json.dumps({ 'error_msg' : "%s" % e}),
+                                mimetype="application/json",status=400)
+    try:
+        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+    except Exception as e:
+        HTTPres['Access-Control-Allow-Origin'] = "*"
+    return HTTPres
+        
 def login(request):
     try:
         response = {
@@ -217,7 +263,6 @@ def login(request):
         if cookie is not None and 'kbase_sessionid' in response:
             cookie = "un=%s|kbase_sessionid=%s" % (response['user_id'],response['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
-            HTTPres.set_cookie( 'kbase_session', cookie)
     except Exception, e:
         response['error_msg'] = "%s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
