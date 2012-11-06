@@ -33,6 +33,13 @@ except:
     logging.error("KBASE_SESSION_SALT not set in settings file, using hard coded default")
     salt = "(African || European)?"
 
+# If we have a front end proxy, hopefully the URL used to access the
+# django instance will be configured in the settings file
+try:
+    proxy_baseurl = settings.PROXY_BASEURL
+except:
+    proxy_baseurl = None
+
 http = httplib2.Http(disable_ssl_certificate_validation=True)
 
 # Get an instance of the roles handlers so that we can use it to fetch role
@@ -104,15 +111,21 @@ def current_datetime(request):
     html = "<html><body>It is now %s.</body></html>" % now
     return HttpResponse(html)
 
+def get_baseurl(request):
+    if proxy_baseurl is None:
+        if request.is_secure():
+            scheme = 'https://'
+        else:
+            scheme = 'http://'
+            print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
+        url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
+    else:
+        url = proxy_baseurl
+    return( url)
+
 def show_login_screen(request):
     return_url = request.GET.get('return_url')
-    if request.is_secure():
-        scheme = 'https://'
-    else:
-        scheme = 'http://'
-    print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
-    base_url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
-    
+    base_url = get_baseurl(request)
     if return_url is not None:
         login_screen = django.template.loader.render_to_string('login-screen.html',
                                                                { 'return_url' : return_url,
@@ -123,12 +136,7 @@ def show_login_screen(request):
     return HttpResponse( login_screen)
 
 def login_js(request):
-    if request.is_secure():
-        scheme = 'https://'
-    else:
-        scheme = 'http://'
-    print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
-    base_url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
+    base_url = get_baseurl(request)
     login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
     HTTPres = HttpResponse( login_js, content_type = "text/javascript")
     try:
