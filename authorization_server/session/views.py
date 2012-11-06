@@ -106,15 +106,6 @@ def current_datetime(request):
 
 def show_login_screen(request):
     return_url = request.GET.get('return_url')
-    if return_url is not None:
-        login_screen = django.template.loader.render_to_string('login-screen.html',
-                                                               { 'return_url' : return_url })
-    else:
-        login_screen = django.template.loader.render_to_string('login-screen.html',{})
-    return HttpResponse( login_screen)
-
-def login_js(request):
-    return_url = request.GET.get('return_url')
     if request.is_secure():
         scheme = 'https://'
     else:
@@ -123,11 +114,22 @@ def login_js(request):
     base_url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
     
     if return_url is not None:
-        login_js = django.template.loader.render_to_string('login-dialog.js',
-                                                           { 'return_url' : return_url,
-                                                             'base_url' : base_url })
+        login_screen = django.template.loader.render_to_string('login-screen.html',
+                                                               { 'return_url' : return_url,
+                                                                 'base_url' : base_url })
     else:
-        login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
+        login_screen = django.template.loader.render_to_string('login-screen.html',
+                                                               { 'base_url' : base_url})
+    return HttpResponse( login_screen)
+
+def login_js(request):
+    if request.is_secure():
+        scheme = 'https://'
+    else:
+        scheme = 'http://'
+    print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
+    base_url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
+    login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
     HTTPres = HttpResponse( login_js, content_type = "text/javascript")
     try:
         HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
