@@ -196,10 +196,10 @@ def logout(request):
             HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
                                     mimetype="application/json")
             cookie = "un=%s|kbase_sessionid=%s" % (username,kbase_sessionid)
-            HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us",expires='Thu, 01 Jan 1970 00:00:01 GMT')
+            HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us", path="/",expires='Thu, 01 Jan 1970 00:00:01 GMT')
 
         else:
-            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
+            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s not found' % kbase_sessionid }),
                                     mimetype="application/json",status=404)
     except Exception, e:
         HTTPres = HttpResponse( json.dumps({ 'error_msg' : "%s" % e}),

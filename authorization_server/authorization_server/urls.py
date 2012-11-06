@@ -17,7 +17,7 @@ urlpatterns = patterns('',
     url(r'^Sessions/?$','session.views.show_login_screen'),
     url(r'^Sessions/Login/?$','session.views.login', name='session.login-handler'),
     url(r'^Sessions/Logout/?$','session.views.logout', name='session.logout-handler'),
-    url(r'^Sessions/login-dialog.js/?$','session.views.login_js'),
+    url(r'^Sessions/login-dialog$','session.views.login_js'),
     url(r'^Sessions/login-form/?$','session.views.login_form', name='session.login-form'),
     url(r'^Sessions/Exists/?$','session.views.exists'),
 
