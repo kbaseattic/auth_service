@@ -1,6 +1,8 @@
 from django.conf.urls import patterns, include, url
 from django.conf.urls.defaults import *
 from oauth import AuthStatus
+from django.conf import settings
+from django.conf.urls.static import static
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -13,8 +15,10 @@ urlpatterns = patterns('',
     url(r'^Roles/(?P<role_id>[^/]+)$','authorization_server.handlers.role_handler'),
     url(r'^Roles/?$','authorization_server.handlers.role_handler'),
     url(r'^Sessions/?$','session.views.show_login_screen'),
-    url(r'^Sessions/Login?$','session.views.login'),
-    url(r'^Sessions/Exists?$','session.views.exists'),
+    url(r'^Sessions/Login/?$','session.views.login'),
+    url(r'^Sessions/login-dialog.js/?$','session.views.login_js'),
+    url(r'^Sessions/login-form/?$','session.views.login_form', name='session.login-form'),
+    url(r'^Sessions/Exists/?$','session.views.exists'),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),

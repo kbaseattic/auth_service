@@ -106,6 +106,35 @@ def show_login_screen(request):
         login_screen = django.template.loader.render_to_string('login-screen.html',{})
     return HttpResponse( login_screen)
 
+def login_js(request):
+    return_url = request.GET.get('return_url')
+    if request.is_secure():
+        scheme = 'https://'
+    else:
+        scheme = 'http://'
+    base_url = '%s%s' % (scheme, request.get_host())
+
+    
+    if return_url is not None:
+        login_js = django.template.loader.render_to_string('login-dialog.js',
+                                                           { 'return_url' : return_url,
+                                                             'base_url' : base_url })
+    else:
+        login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
+    return HttpResponse( login_js, content_type = "text/javascript")
+
+def login_form(request):
+    login_form = django.template.loader.render_to_string('login-form.html',{})
+    HTTPres = HttpResponse( login_form)
+    # Enable some basic CORS support
+    HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    try:
+        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+    except Exception as e:
+        HTTPres['Access-Control-Allow-Origin'] = "*"
+    return HTTPres
+
+
 def exists(request):
     try:
         response = {}
