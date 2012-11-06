@@ -150,7 +150,7 @@ function login(username, password, callback) {
 	//    form_params.cookie = "only";
 	}
         $.ajax({ type: "POST",
-		 url: "https://www.kbase.us/services/authorization/Sessions/Login",
+		 url: "{{base_url}}{% url session.login-handler %}",
 		 //data : { 'user_id' : username,
 		 //	  'password' : password,
 		 //	  'cookie' : 'only' },
