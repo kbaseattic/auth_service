@@ -169,6 +169,8 @@ LOGGING = {
         },
     }
 }
+# Force the default base_url to be the one used by the front end kbase proxy
+PROXY_BASEURL = "https://kbase.us/services/authorization"
 
 try:
     from local_settings import *

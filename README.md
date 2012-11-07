@@ -59,10 +59,15 @@ from: https://trac.kbase.us/projects/kbase/wiki/IntegrationTargets
 file named local_settings.py in
    /kb/dev_container/modules/auth_service/authorization_server/authorization_server
    If there is no local_settings file the service will default to the instance on mongodb.kbase.us,
-   however you will also need to set a salt value for the KBase session service, used to
+   However you will also need to set a salt value for the KBase session service, used to
 calculate a unique hash value for the session ID.
+   There is also a PROXY_BASEURL setting that defines the entry URL that used to access this
+django service. This is necessary to generate self-referring URL's when the front end
+NGINX proxy is in operation - it needs to be disabled for local testing/development
+
    Here are recommended settings to put in the local_settings.py file:
 KBASE_SESSION_SALT = "(African || European)?"
+PROXY_BASEURL =	   None
 
    If you want to use your own mongodb service running on localhost, you would add
 an extra setting:
