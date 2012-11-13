@@ -207,10 +207,10 @@ class RoleHandlerTest(TestCase):
         respjson = json.loads(resp.content)
         self.assertTrue(len(respjson) > 0, "Expecting multiple responses")
         fields = list(set(reduce( operator.add,[x.keys() for x in respjson],[] )))
-        self.assertEquals( fields,['role_id'], "Expecting a single field, 'role_id', across all results")
+        self.assertEquals( fields,['_id','role_id'], "Expecting two fields, ['_id','role_id'], across all results")
 
         # double check by pulling all records from mongodb and making sure the role_id values match
-        role_ids = list(set(reduce( operator.add,[x.values() for x in respjson],[] )))
+        role_ids = [x['role_id'] for x in respjson]
         role_ids.sort()
         dbroles = self.roles.find( filter, fields)
         role_idsdb = [x['role_id'] for x in dbroles]
