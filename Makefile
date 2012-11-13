@@ -35,6 +35,8 @@ deploy-test-services: deploy-nginx
 	cd $(SERVICE_DIR); cp django-localhost.conf django.conf ; \
 	./stop_service ; sleep 5; ./start_service
 
+.PHONY: test
+
 test: test_django
 
 test_django:
