@@ -71,18 +71,36 @@ try:
 except:
     session_lifetime = 3600
 
+# field name mappings from GO to Bio::KBase::AuthUser fields
+field_rename = { "username" : "user_id",
+                 "email_validated" : "verified",
+                 "opt_in" : "opt_in",
+                 "fullname" : "name",
+                 "email" : "email",
+                 "system_admin" : "system_admin",
+                 "custom_fields" : "custom_fields"}
+
+# Default fields to return in body of response when
+# logging in. CSV of the fieldnames
+default_fields = 'user_id,name'
+
+# List of fields that we fetch from GO
+GO_fields = ",".join(field_rename.keys())
+
 def get_profile(token):
     try:
         token_map = {}
         for entry in token.split('|'):
             key, value = entry.split('=')
             token_map[key] = value
-        keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=groups,username,email_validated,fullname,email"
+        keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=%s" % GO_fields
         res,body = http.request(keyurl,"GET",
                                 headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
         if (200 <= int(res.status)) and ( int(res.status) < 300):
-            profile = json.loads( body)
-            profile['groups'] = role_handler.get_groups( profile['username'])
+            profile2 = json.loads( body)
+            # rename the fields to match
+            profile = { field_rename[key] : profile2[ key ] for key in field_rename.keys() }
+            profile['groups'] = role_handler.get_groups( profile['user_id'])
             return profile
         logging.error( body)
         raise Exception("HTTP", res)
@@ -117,7 +135,6 @@ def get_baseurl(request):
             scheme = 'https://'
         else:
             scheme = 'http://'
-            print "HTTP_HOST='%s'\nget_host() = '%s'" % (request.META['HTTP_HOST'],request.get_host())
         url = '%s%s' % (scheme, request.META.get('HTTP_HOST', request.get_host()))
     else:
         url = proxy_baseurl
@@ -229,6 +246,7 @@ def login(request):
         cookie = request.POST.get('cookie')
         # Session lifetime for mongodb sessions. Default set in settings file
         lifetime = request.POST.get('lifetime',session_lifetime)
+        fields = request.POST.get('fields',default_fields)
         if (response['user_id'] is not None and password is not None):
             url = authsvc + "goauth/token?grant_type=client_credentials"
             try:
@@ -262,7 +280,9 @@ def login(request):
             sessiondb.insert(response)
             # Expire old sessions
             sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
-
+            # Convert the datetime objects to string representations
+            response['creation'] = "%s" % response['creation']
+            response['expiration'] = "%s" % response['expiration']
         # Enable some basic CORS support
         HTTPres['Access-Control-Allow-Credentials'] = 'true'
         try:
