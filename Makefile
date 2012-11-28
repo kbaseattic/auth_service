@@ -13,9 +13,9 @@ SERVICE = authorization_server
 SERVICE_DIR = $(TARGET)/services/$(SERVICE)
 NGINX_CONF = /etc/nginx/conf.d/
 
-all: deploy-services
+all:
 
-deploy:
+deploy: deploy-services
 
 deploy-nginx:
 	cp nginx.conf $(NGINX_CONF)/$(SERVICE).conf ; \
@@ -34,6 +34,12 @@ deploy-test-services: deploy-nginx
 	cd $(SERVICE_DIR)/$(SERVICE);echo no|python ./manage.py syncdb ; \
 	cd $(SERVICE_DIR); cp django-localhost.conf django.conf ; \
 	./stop_service ; sleep 5; ./start_service
+
+deploy-docs:
+	# create docs here in docs directory and deploy them if needed
+	#mkdir -p $(SERVICE_DIR)
+	#mkdir -p $(SERVICE_DIR)/webroot
+	#cp docs/*html $(SERVICE_DIR)/webroot/.
 
 .PHONY: test
 
