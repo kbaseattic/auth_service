@@ -82,7 +82,7 @@ field_rename = { "username" : "user_id",
 
 # Default fields to return in body of response when
 # logging in. CSV of the fieldnames
-default_fields = 'user_id,name'
+default_fields = 'user_id,name,email,groups'
 
 # List of fields that we fetch from GO
 GO_fields = ",".join(field_rename.keys())
@@ -97,11 +97,12 @@ def get_profile(token):
         res,body = http.request(keyurl,"GET",
                                 headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
         if (200 <= int(res.status)) and ( int(res.status) < 300):
-            profile2 = json.loads( body)
+            profile = json.loads( body)
             # rename the fields to match
-            profile = { field_rename[key] : profile2[ key ] for key in field_rename.keys() }
-            profile['groups'] = role_handler.get_groups( profile['user_id'])
-            return profile
+            profile2 = { field_rename[key] : profile[ key ] for key in field_rename.keys() }
+            profile2['groups'] = role_handler.get_groups( profile2['user_id'])
+            # strip out unrequested fields
+            return profile2
         logging.error( body)
         raise Exception("HTTP", res)
     except Exception, e:
@@ -256,10 +257,16 @@ def login(request):
                     key, value = entry.split('=')
                     token_map[key] = value
                 response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
-                profile = get_profile(response['token'])
+                profile_tmp = get_profile(response['token'])
+                custom_fields = profile_tmp.get( 'custom_fields',{})
+                del profile_tmp['custom_fields']
+                profile_tmp.update(custom_fields)
+                profile = {}
+                try:
+                    profile = { key : profile_tmp[key] for key in fields.split(",") }
+                except KeyError as e:
+                    response['error_msg'] = "Unknown field requested: %s" % e
                 response.update(profile)
-                response.update(profile['custom_fields'])
-                del response['custom_fields']
             except Exception as e:
                 response['error_msg'] = "%s" % e
         else:

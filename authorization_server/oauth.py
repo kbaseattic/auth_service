@@ -176,7 +176,6 @@ class OAuth2Middleware(AuthenticationMiddleware):
                 # For now, compute a sessionid based on hashing the
                 # the signature with the salt
                 request.META['KBASEsessid'] = hashlib.sha256(token_map['sig']+OAuth2Middleware.salt).hexdigest()
-                print pformat( request.META['KBASEsessid'])
                 # Add in some useful details that came in from the token validation
                 request.META['KBASEprofile'] = profile
                 login(request,user)
