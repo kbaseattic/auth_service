@@ -87,6 +87,14 @@ default_fields = 'user_id,name,email,groups'
 # List of fields that we fetch from GO
 GO_fields = ",".join(field_rename.keys())
 
+# list of fields that we offer
+tmp = set(field_rename.values())
+tmp.remove('custom_fields')
+tmp.add('groups')
+tmp.add('token')
+tmp.add('kbase_sessionid')
+all_fields = ",".join(tmp)
+
 def get_profile(token):
     try:
         token_map = {}
@@ -155,7 +163,9 @@ def show_login_screen(request):
 
 def login_js(request):
     base_url = get_baseurl(request)
-    login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
+    #login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
+    login_js = django.template.loader.render_to_string('login-dialog2.js',{'base_url' : base_url,
+                                                                           'all_fields' : all_fields})
     HTTPres = HttpResponse( login_js, content_type = "text/javascript")
     try:
         HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
@@ -257,16 +267,14 @@ def login(request):
                     key, value = entry.split('=')
                     token_map[key] = value
                 response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
-                profile_tmp = get_profile(response['token'])
-                custom_fields = profile_tmp.get( 'custom_fields',{})
-                del profile_tmp['custom_fields']
-                profile_tmp.update(custom_fields)
-                profile = {}
-                try:
-                    profile = { key : profile_tmp[key] for key in fields.split(",") }
-                except KeyError as e:
-                    response['error_msg'] = "Unknown field requested: %s" % e
+                profile = get_profile(response['token'])
+                custom_fields = profile.get( 'custom_fields',{})
+                del profile['custom_fields']
+                profile.update(custom_fields)
                 response.update(profile)
+                delkeys = set(response.keys()) - set( fields.split(","))
+                for key in delkeys:
+                    del response[key]
             except Exception as e:
                 response['error_msg'] = "%s" % e
         else:
