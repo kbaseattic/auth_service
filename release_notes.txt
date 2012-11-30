@@ -1,0 +1,4 @@
+
+   This release of the authorization_service includes the following features:
+   1) Support for acquiring login sessions through a javascript UI widget. This is still in flux and under active development. Documentation will be forthcoming. The endpoint is at .../Sessions/*
+   2) The roles service now uses json schema validation to ensure that correct types are passed in are of the correct type
