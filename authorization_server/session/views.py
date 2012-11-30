@@ -93,7 +93,7 @@ tmp.remove('custom_fields')
 tmp.add('groups')
 tmp.add('token')
 tmp.add('kbase_sessionid')
-all_fields = ",".join(tmp)
+all_fields = ",".join([ '\'%s\'' % x for x in tmp])
 
 def get_profile(token):
     try:
@@ -163,8 +163,7 @@ def show_login_screen(request):
 
 def login_js(request):
     base_url = get_baseurl(request)
-    #login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url})
-    login_js = django.template.loader.render_to_string('login-dialog2.js',{'base_url' : base_url,
+    login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url,
                                                                            'all_fields' : all_fields})
     HTTPres = HttpResponse( login_js, content_type = "text/javascript")
     try:

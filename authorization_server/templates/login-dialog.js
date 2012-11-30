@@ -1,259 +1,840 @@
-var user_callback;
+/*
 
-$(function() {
-      
-      // Placeholder for user defined callback function
-      var $ld = $(document.createElement('div')).attr('id','login-dialog').attr('title','KBase Login');
-      $ld.load('{{base_url}}{% url session.login-form %}' ).appendTo('body');
-      $ld.attr('style','height: "auto" ');
+    KBase JQueryUI plugin to handle all login/session related stuff.
 
-      $ld.dialog(
-          {
-              autoOpen : false,
-              modal : true,
-              resizable: true,
-	      width : 'auto',
-              buttons : {
-                  Cancel : function () {
-                      $( this ).dialog('close');
-                  },
-                  Login : function() {
+    Set up a container on your HTML page. It can be whatever you'd like. For example.
 
-                      var username = $("#login-username").val();
-                      var password = $("#login-password").val();
+    <div id = 'fizzlefazzle'></div>
 
-                      $(this).trigger('message', username);
+    You don't need to give it that ID. I just populated it with junk because I don't want to
+    encourage people to use something generic like 'login', since there's no need. You don't need
+    an ID at all, just some way to select it.
 
-                      login.call(this, username, password, function(success, args) {
+    Later, in your jquery initialization, do this:
 
-                                     if ( success ) {
-                                         $(this).trigger('clearMessages');
-                                         $("#login-entrance").hide();
-                                         $("#login-loggedinusername").text(args.username);
-                                         $("#login-loggedinsession").text(args.kbase_sessionid);
-                                         $("#login-userdisplay").show();
-                                         $(this).dialog('close');
-					 if (user_callback) {
-					     user_callback( args);
-					 }
-                                     }
-                                     else {
-                                         $(this).trigger('error', args.message);
-                                     }
-                                 });
+    $(function() {
+        ...
 
-                  },
-                  Logout : function() {
-		      logout();
-                      $(this).trigger('clearMessages');
-		      $('#form_input').show();
-		      $(".ui-dialog-buttonpane button:contains('Login')").button("enable");
-		      $(".ui-dialog-buttonpane button:contains('Logout')").button("disable");
+        $(#"fizzlefaszzle").login();
 
-                  },
-              },
-              open : function() {
-                  $('form', $(this))[0].reset();
-                  $(this).trigger('clearMessages');
-                  $(this).unbind('keypress');
-		  $(".ui-dialog-buttonpane button:contains('Logout')").button("disable");
-                  $(this).keypress(function(e) {
-                                       if (e.keyCode == $.ui.keyCode.ENTER) {
-                                           $('button:last', $(this).parent()).trigger("click");
-                                           e.stopPropagation();
-                                       }
-                                   });
-              },
-          }
-      );
-
-      $ld.bind('error', function(event, msg) {
-		   $(this).attr('style','height: "auto" ');
-                   $(this).trigger('clearMessages');
-                   $("#login-error").show();
-                   $("#login-errormsg").html(msg);
-               });
-
-      $ld.bind('message', function(event, msg) {
-		   $(this).attr('style','height: "auto" ');
-                   $(this).trigger('clearMessages');
-                   $("#login-pending").show();
-                   $("#login-pendinguser").html(msg);
-               });
-
-      $ld.bind('already_logged_in', function(event, msg) {
-		   $(this).attr('style','height: "auto" ');
-                   $(this).trigger('clearMessages');
-                   $("#login-pending").hide();
-                   $("#form_input").hide();
-                   $("#already_logged_in").show();
-                   $("#logged_in_user").html(msg); 
-		   $(".ui-dialog-buttonpane button:contains('Login')").button("disable");
-		   $(".ui-dialog-buttonpane button:contains('Logout')").button("enable");
-
-               });
-
-      $ld.bind('clearMessages', function(event) {
-                   $("#login-error").hide();
-                   $("#login-pending").hide();
-                   $("#already_logged_in").hide();
-               });
-
-      $( "#login-widget button" ).button();
-
-  });
-
-function login(username, password, callback) {
-
-    // STEVE -
-
-
-    // do whatever you need to do here to log the user into of the system
-    // Right now the callback function takes a boolean and an object. the boolean
-    // is whether or not the login was successful, and the object is just an arbitrary context.
-    //
-    // Right now, the important args keys that should be populated are:
-    //
-    // username - the user logged in. This can be the actual username, or a human readable name.
-    //            we can break that out into separate keys if that seems useful.
-    // message  - any status message provided. Usually a reason the login failed.
-
-    //this is the boolean that gets passed into the callback to determine whether or not it was a succesful login.
-    var status = 1;
-    //and the arbitrary args, pre-populated with the username for your convenience.
-    var args = { username : username };
-
-    // this is just here to simulate the time of a login negotiation taking place. Set the value to 0
-    // when in production to skip the arbitrary 1 second delay.
-    // When running as a demo, it also randomly fails to login sometimes.
-    var logindemo = 1;
-
-    // here's a couple of simple cases that need to be handled somewhere. Figured I'd just toss 'em into this function
-    // to keep 'em all in one place.
-    var that = this;
-    if (username.length == 0) {
-        args.message = 'Cannot login w/o username';
-        status = 0;
-        callback.call(that, status, args);
-    } else if (password.length == 0) {
-        args.message = 'Cannot login w/o password';
-        status = 0;
-        callback.call(that, status, args);
-
-    } else {
-	var form_params = {
-	    'user_id' : username,
-	    'password' : password,
-	    'cookie' : 1
-	};
-	if (! user_callback) {
-	//    form_params.cookie = "only";
-	}
-        $.ajax({ type: "POST",
-		 url: "{{base_url}}{% url session.login-handler %}",
-		 //data : { 'user_id' : username,
-		 //	  'password' : password,
-		 //	  'cookie' : 'only' },
-		 data : form_params,
-		 dataType: "json",
-		 crossDomain : true,
-		 xhrFields: { withCredentials: true },
-		 success: function (data,res,jqXHR) {
-		     var args = {};
-		     var cookie = '';
-		     // Look for a kbase_session cookie
-		     if (user_callback) {
-			 if ('token' in data) {
-			     args = data
-			     callback.call(that,1,args)
-			 } else {
-			     args.message = data.error_msg;
-			     callback.call(that,0,args);
-			 }
-		     } else {
-			 var i,x,y,ARRcookies=document.cookie.split(";");
-			 for (i=0;i<ARRcookies.length;i++) {
-			     x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
-			     y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
-			     x=x.replace(/^\s+|\s+$/g,"");
-			     if (x=='kbase_session') {
-				 cookie = unescape(y);
-			     }
-			 }
-			 if ( cookie ) {
-			     var m = /un=(\w+)\|kbase_sessionid=(\w+)/g.exec( cookie );
-			     args.username = m[1];
-			     args.kbase_sessionid = m[2];
-			     callback.call(that,1,args)
-			 } else {
-			     args.message = 'Failed to authenticate';
-			     callback.call(that,0,args);
-			 }
-		     }
-		 },
-		 error: function (jqXHR, textStatus, errorThrown) {
-		     // If we have a useless error message, replace with
-		     // friendly, but useless error message
-		     if (textStatus == "error") {
-			 textStatus = "Error connecting to KBase login server";
-		     }
-		     callback.call(that,0, { 'message' : textStatus })
-		 },
-		 xhrFields: {
-		     withCredentials: true
-		 },
-		 beforeSend : function(xhr){
-		     // make cross-site requests
-		     xhr.withCredentials = true;
-		 },
-	       });
-    }
-}
-
-function get_kbase_cookie() {
-    var cookie = '';
-    var args = {};
-    
-    // Look for a kbase_session cookie
-    var i,x,y,ARRcookies=document.cookie.split(";");
-    for (i=0;i<ARRcookies.length;i++) {
-	x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
-	y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
-	x=x.replace(/^\s+|\s+$/g,"");
-	if (x=='kbase_session') {
-	    cookie = unescape(y);
-	}
-    }
-    var m = /un=(\w+)\|kbase_sessionid=(\w+)/g.exec( cookie );
-    if (m) {
-	args.username = m[1];
-	args.kbase_sessionid = m[2];
-    }
-    return( args);
-}
-
-
-function logout() {
-
-    // Expire the current session cookie
-    cookie = 'kbase_session=; domain=.kbase.us; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/';
-    document.cookie = cookie;
-
-    //automatically prompt to log in again
-    $('#login-dialog').dialog('open');
-}
-
-function login_dialog( callback ) {
-    var args = get_kbase_cookie();
-
-    $('#login-dialog').dialog('open');
-    if (callback) {
-	user_callback = callback;
-    } else {
-	user_callback = null;
     }
 
-    if ('username' in args) {
-	$('#login-dialog').trigger('already_logged_in', args.username)
-    }
-}
+    And that, my friends, is Jenga. You're done. Sit back and enjoy the fruits of your labor.
+
+    There are a couple of useful things to know about. You can extract the user_id and kbase_sessionid:
+
+        $(#"fizzlefazzle").login('session', 'user_id');
+        $(#"fizzlefazzle").login('session', 'kbase_sessionid');
+
+    When you're setting it up, you have a few options:
+
+    $('#fizzlefazzle').login(
+        {
+            style : (button|slim|micro|hidden) // try 'em all out! button is the default.
+            loginURL : the URL we're logging into
+            login_callback : a function to be called upon login, success or failure. Gets an args hash  (user_id, kbase_sessionid)
+            logout_callback : a function to be called upon logout, gets no args
+            prior_login_callback : a function to be called upon loading a page, if the user was already logged in. Gets an args hash (user_id, kbase_sessionid)
+            user_id : a string with which to pre-populate the user_id on the forms.
+        }
+    );
+
+    You can also completely inline it.
+
+    	var $login_doodad = $('<span></span>').login({style : 'hidden'});
+    	$login_doodad.login('login', 'username', 'password', function (args) {
+    		console.log("Tried to log in and got back: "); console.log(args);
+    	});
+
+*/
+
+
+(function( $, undefined ) {
+
+
+    $.widget("kbase.login", {
+        version: "1.0.0",
+        options: {
+            style : 'button',
+            loginURL : "{{base_url}}{% url session.login-handler %}",
+            login_button_options : {label : 'Login'},
+	    possibleFields : [{{all_fields|safe}}],
+            fields : ['fullname', 'kbase_sessionid', 'user_id'],
+        },
+
+    get_kbase_cookie : function () {
+
+        var chips = {};
+
+        var cookieString = $.cookie('kbase_session');
+
+        if (cookieString == undefined) {
+            return chips;
+        }
+
+        var pairs = cookieString.split('\|');
+
+        for (var i = 0; i < pairs.length; i++) {
+            var set = pairs[i].split('=');
+            chips[set[0]] = set[1];
+        }
+
+        chips.success = 1;
+
+        return chips;
+    },
+
+        _init: function() {
+
+            var kbaseCookie = this.get_kbase_cookie();
+
+            this.element.empty();
+
+            var style = '_' + this.options.style + 'Style';
+
+            this.ui = this[style]();
+            if (this.ui) {
+                this.element.append(this.ui);
+            }
+
+            if (kbaseCookie.user_id) {
+
+                if (this.registerLogin) {
+                    this.registerLogin(kbaseCookie);
+                }
+                if (this.options.prior_login_callback) {
+                    this.options.prior_login_callback.call(this, kbaseCookie);
+                }
+
+                this.data('_session', kbaseCookie);
+
+            }
+
+        },
+
+        data : function (key, val) {
+            if (this.options._storage == undefined) {
+                this.options._storage = {};
+            }
+
+            if (arguments.length == 2) {
+                this.options._storage[key] = val;
+            }
+
+            return this.options._storage[key];
+        },
+
+        _rewireIds : function($elem, $target) {
+
+            if ($target == undefined) {
+                $target = $elem;
+            }
+
+            $elem.removeAttr('id');
+
+            $.each(
+                $elem.find('[id]'),
+                function(idx) {
+                    $target.data($(this).attr('id'), $(this));
+                    $(this).removeAttr('id');
+                    }
+            );
+
+            return $elem;
+        },
+
+        registerLoginFunc  : function() { return this.registerLogin },
+        specificLogoutFunc : function() { return this.specificLogout },
+
+        populateLoginInfo : function (args) {
+            if (args.success) {
+                this.data('_session', args);
+                this._error = undefined;
+            }
+            else {
+                this.data('_session', {});
+                this._error = args.message;
+            }
+        },
+
+        session : function(key, value) {
+
+            if (this.data('_session') == undefined) {
+                this.data('_session', {});
+            }
+
+            var session = this.data('_session');
+
+            if (arguments.length == 2) {
+                session[key] = value;
+            }
+
+            if (arguments.length > 0) {
+                return session[key];
+            }
+            else {
+                return session;
+            }
+        },
+
+        error : function(new_error) {
+            if (new_error) {
+                this._error = new_error;
+            }
+
+            return this._error;
+        },
+
+        openDialog : function() {
+        	if (this.data('loginDialog')) {
+        		this.data('loginDialog').dialog('open');
+        	}
+        },
+
+        _hiddenStyle : function() {
+
+			this.data('loginDialog', this._createLoginDialog());
+
+			this.registerLogin =
+				function(args) {
+					if (args.success) {
+						this.data('loginDialog').dialog('close');
+					}
+					else {
+                        this.data('loginDialog').trigger('error', args.message);
+                    }
+				};
+
+            return undefined;
+        },
+
+        _slimStyle : function() {
+
+        	this.data('loginDialog', undefined);
+
+            var $prompt = $('<span></span>')
+                .attr('class', 'ui-widget ui-widget-content ui-corner-all')
+                .css('display', 'inline-block')
+                .css('padding', '2px')
+                .append(
+                    $('<span></span>')
+                        .attr('id', 'entrance')
+                            .append(
+                                    $('<label></label>')
+                                            .attr('for', 'user_id')
+                                            .append('username:')
+                                    .append(
+                                        $('<input/>')
+                                            .attr('type', 'text')
+                                            .attr('name', 'user_id')
+                                            .attr('id', 'user_id')
+                                            .attr('size', '20')
+                                            .val(this.options.user_id)
+                                    )
+                            )
+                            .append(
+                                $('<label></label>')
+                                    .attr('for', 'password')
+                                    .append('password:\n')
+                            )
+                            .append(
+                                $('<input/>')
+                                    .attr('type', 'password')
+                                    .attr('name', 'password')
+                                    .attr('id', 'password')
+                                    .attr('size', '20')
+                            )
+                            .append(
+                                $('<button></button>')
+                                    .attr('id', 'loginbutton')
+                                    .append('%nbsp;')
+                            )
+                )
+                .append(
+                    $('<span></span>')
+                        .attr('id', 'userdisplay')
+                        .attr('style', 'display : none;')
+                        .append(
+                            $('<span></span>')
+                                .attr('style', 'text-align : center')
+                                .append('Logged in as ')
+                                .append(
+                                    $('<span></span>')
+                                        .attr('id', 'loggedinuser_id')
+                                        .attr('style', 'font-weight : bold')
+                                        .append('user_id\n')
+                                )
+                                .append(' ')
+                                .append(
+                                    $('<button></button>')
+                                        .attr('id', 'logoutbutton')
+	                                    .append('%nbsp;')
+                                )
+                        )
+                );
+
+            this._rewireIds($prompt, this);
+
+            this.data('loginbutton').button({text : false, icons : {primary : 'ui-icon-key'}});
+            this.data('logoutbutton').button({text : false, icons : {primary : 'ui-icon-circle-close'}});
+
+            this.data('password').keypress(
+                $.proxy(
+                    function(e) {
+                        if (e.keyCode == $.ui.keyCode.ENTER) {
+                            this.data('loginbutton').trigger("click");
+                            e.stopPropagation();
+                        }
+                    },
+                    this
+                )
+            );
+
+            this.registerLogin =
+                function(args) {
+
+                    this.data('loginbutton').button({icons : {primary : 'ui-icon-key'}});
+
+                    if ( args.success ) {
+                        this.data("entrance").hide();
+                        this.data('user_id').val('');
+                        this.data('password').val('');
+                        this.data("loggedinuser_id").text(args.fullname);
+                        this.data("userdisplay").show();
+                    }
+                    else {
+                        $(function() {
+                            $('<div></div>')
+                                .attr('class', 'ui-state-error ui-corner-all')
+                                .attr('style', 'padding: 0 .7em;')
+                                .append(
+                                    $('<p></p>')
+                                        .append(
+                                            $('<span></span>')
+                                                .attr('class', 'ui-icon ui-icon-alert')
+                                                .attr('style', 'float: left; margin-right: .3em;')
+                                        )
+                                        .append(
+                                            $('<strong></strong>').append(args.message)
+                                        )
+                                )
+                                .dialog({
+                                    modal: true,
+                                    title : 'Error',
+                                    buttons: {
+                                        Ok: function() {
+                                            $( this ).dialog( "close" );
+                                        }
+                                }
+                            });
+                        });
+                    }
+                };
+
+            this.specificLogout = function(args) {
+                this.data("userdisplay").hide();
+                this.data("entrance").show();
+            };
+
+            this.data('loginbutton').bind(
+                'click',
+                $.proxy(
+                    function(evt) {
+
+                        this.data('loginbutton').button({icons : {primary : 'ui-icon-refresh'}});
+
+                        this.login(
+
+                            this.data('user_id').val(),
+                            this.data('password').val(),
+                            function(args) {
+
+                                this.registerLogin(args);
+
+                                if (this.options.login_callback) {
+                                    this.options.login_callback.call(this, args);
+                                }
+                            }
+                        );
+
+                    },
+                    this
+                )
+            );
+
+            this.data('logoutbutton').bind('click',
+                $.proxy(
+                    function(e) {
+                        this.logout();
+                        this.data('user_id').focus();
+                    },
+                    this
+                )
+            );
+
+            return $prompt;
+
+        },
+
+        _microStyle : function() {
+            var $prompt = $('<span></span>')
+                .append(
+                    $('<button></button>')
+                        .attr('id', 'loginbutton')
+                        .append('%nbsp;')
+                );
+
+            this._rewireIds($prompt, this);
+
+            this.data('loginbutton').button({text : false, icons : {primary : 'ui-icon-key'}});
+
+            this._createLoginDialog();
+
+            this.data('loginbutton').bind(
+                'click',
+                $.proxy(
+                    function(evt) {
+                        this.data('loginDialog').dialog('open');
+                    },
+                    this
+                )
+            );
+
+            this.registerLogin =
+                function(args) {
+
+                    if ( args.success ) {
+
+                        this.data('loginDialog').trigger('clearMessages');
+                        this.data('loginDialog').dialog('close');
+
+                        this.data('loginbutton').tooltip(
+                            {
+                                disabled : false,
+                                content : 'Logged in as ' + args.fullname
+                            }
+                        );
+
+                        this.data('loginbutton').button({icons : {primary : 'ui-icon-person'}});
+
+                        this.data('loginbutton').bind(
+                            'click',
+                            $.proxy(
+                                function(evt) {
+                                    this.logout();
+                                },
+                                this
+                            )
+                        );
+                    }
+                    else {
+                        this.data('loginDialog').trigger('error', args.message);
+                    }
+                };
+
+            this.specificLogout =
+                function() {
+                    this.data('loginbutton').tooltip({disabled : true});
+                    this.data('loginbutton').button({icons : {primary : 'ui-icon-key'}});
+                };
+
+            return $prompt;
+
+        },
+
+        _buttonStyle : function () {
+            var $prompt = $('<div></div>')
+                .attr('class', 'ui-widget ui-widget-content ui-corner-all')
+                .attr('style', 'width : 250px;')
+                .append(
+                    $('<h3></h3>')
+                        .attr('class', 'ui-widget-header ui-corner-top')
+                        .attr('style', 'padding : 5px; margin-top : 0px; border : 0px ')
+                        .append('User\n')
+                )
+                .append(
+                    $('<div></div>')
+                        .attr('id', 'entrance')
+                        .append(
+                            $('<p></p>')
+                                .attr('style', 'text-align : center')
+                                .append(
+                                    $('<button></button>')
+                                        .attr('id', 'loginbutton')
+                                        .append('&nbsp;')
+                                )
+                        )
+                )
+                .append(
+                    $('<div></div>')
+                        .attr('id', 'userdisplay')
+                        .attr('style', 'display : none;')
+                        .append(
+                            $('<p></p>')
+                                .attr('style', 'text-align : center')
+                                .append('Logged in as ')
+                                .append(
+                                    $('<span></span>')
+                                        .attr('id', 'loggedinuser_id')
+                                        .attr('style', 'font-weight : bold')
+                                        .append('user_id\n')
+                                )
+                                .append(
+                                    $('<button></button>')
+                                        .attr('id', 'logoutbutton')
+                                        .append('Logout\n')
+                                )
+                        )
+                );
+
+            this._rewireIds($prompt, this);
+
+            this.data('loginbutton').button(this.options.login_button_options);
+            this.data('logoutbutton').button();
+
+            var loginDialog = this._createLoginDialog();
+
+            this.data('loginbutton').bind('click',
+                $.proxy(
+                    function(event) {
+                        this.data('loginDialog').dialog('open');
+                    },
+                    this
+                )
+            );
+
+            this.data('logoutbutton').bind('click', $.proxy(this.logout, this));
+
+            this.registerLogin =
+                function(args) {
+
+                    if ( args.success ) {
+                        this.data('loginDialog').trigger('clearMessages');
+                        this.data("entrance").hide();
+                        this.data("loggedinuser_id").text(args.fullname);
+                        this.data("userdisplay").show();
+                        this.data('loginDialog').dialog('close');
+                    }
+                    else {
+                        this.data('loginDialog').trigger('error', args.message);
+                    }
+                };
+
+            this.specificLogout = function(args) {
+                this.data("userdisplay").hide();
+                this.data("entrance").show();
+            };
+
+            return $prompt;
+        },
+
+        _createLoginDialog : function () {
+
+            var $elem = this.element;
+
+            var labelStyle = 'width : 70px; float : left; margin-right : 10px; margin-bottom : 5px; clear : left; text-align : right';
+
+            var $ld = $('<div></div>')
+                .attr('id', 'dialog')
+                .attr('title', 'Login')
+                .css('height', 'auto')
+                .append(
+                    $('<form></form>')
+                        .attr('name', 'form')
+                        .attr('id', 'form')
+                        .append(
+                            $('<fieldset></fieldset>')
+                                .attr('class', 'ui-helper-reset')
+                                .append(
+                                    $('<div></div>')
+                                        .attr('class', 'ui-widget')
+                                        .attr('id', 'error')
+                                        .attr('style', 'display : none')
+                                        .append(
+                                            $('<div></div>')
+                                                .attr('class', 'ui-state-error ui-corner-all')
+                                                .attr('style', 'padding: 0 .7em;')
+                                                .append(
+                                                    $('<p></p>')
+                                                        .append(
+                                                            $('<span></span>')
+                                                                .attr('class', 'ui-icon ui-icon-alert')
+                                                                .attr('style', 'float: left; margin-right: .3em;')
+                                                        )
+                                                        .append(
+                                                            $('<strong></strong>')
+                                                                .append('Error:\n')
+                                                        )
+                                                        .append(
+                                                            $('<span></span>')
+                                                                .attr('id', 'errormsg')
+                                                        )
+                                                )
+                                        )
+                                )
+                                .append(
+                                    $('<div></div>')
+                                        .attr('class', 'ui-widget')
+                                        .attr('id', 'pending')
+                                        .attr('style', 'display : none')
+                                        .append(
+                                            $('<div></div>')
+                                                .attr('class', 'ui-state-highlight ui-corner-all')
+                                                .attr('style', 'padding: 0 .7em;')
+                                                .append(
+                                                    $('<p></p>')
+                                                        .append(
+                                                            $('<span></span>')
+                                                                .attr('class', 'ui-icon ui-icon-info')
+                                                                .attr('style', 'float: left; margin-right: .3em;')
+                                                        )
+                                                        .append(
+                                                            $('<strong></strong>')
+                                                                .append('Logging in as \n')
+                                                                .append(
+                                                                    $('<span></span>')
+                                                                        .attr('id', 'pendinguser')
+                                                                )
+                                                                .append('...\n')
+                                                        )
+                                                )
+                                        )
+                                )
+                                .append(
+                                    $('<div></div>')
+                                        .attr('class', 'inputbox')
+                                        .append(
+                                            $('<label></label>')
+                                                .attr('for', 'user_id')
+                                                .attr('style', labelStyle)
+                                                .append('Username:\n')
+                                        )
+                                        .append(
+                                            $('<input/>')
+                                                .attr('type', 'text')
+                                                .attr('name', 'user_id')
+                                                .attr('id', 'user_id')
+                                                .attr('size', '20')
+                                        )
+                                )
+                                .append(
+                                    $('<div></div>')
+                                        .attr('class', 'inputbox')
+                                        .append(
+                                            $('<label></label>')
+                                                .attr('for', 'password')
+                                                .attr('style', labelStyle)
+                                                .append('Password:\n')
+                                        )
+                                        .append(
+                                            $('<input/>')
+                                                .attr('type', 'password')
+                                                .attr('name', 'password')
+                                                .attr('id', 'password')
+                                                .attr('size', '20')
+                                        )
+                                )
+                        )
+                );
+
+            this._rewireIds($ld, $ld);
+            this.data('loginDialog', $ld);
+
+            $ld.dialog(
+                {
+                    autoOpen : false,
+                    modal : true,
+                    resizable: false,
+                    buttons : {
+                        Cancel : function () {
+                            $( this ).dialog('close');
+                        },
+                        Login : $.proxy(function() {
+
+                            var $ld = this.data('loginDialog');
+
+                            var user_id  = $ld.data("user_id").val();
+                            var password = $ld.data("password").val();
+
+                            this.data('loginDialog').trigger('message', user_id);
+
+                            this.login(user_id, password, function(args) {
+
+                                if (this.registerLogin) {
+                                    this.registerLogin(args);
+                                }
+
+                                if (this.options.login_callback) {
+                                    this.options.login_callback.call(this, args);
+                                }
+                            });
+
+                            },
+                            this
+                        ),
+                    },
+                    open : $.proxy(
+                        function() {
+                            $ld = this.data('loginDialog');
+                            $('form', $ld).get(0).reset();
+                            //assign the user_id, if one is provided.
+                            $ld.data("user_id").focus();
+                            $ld.data("user_id").val( this.session('user_id') || this.options.user_id );
+                            delete this.options.user_id;
+                            this.session('user_id',undefined);
+                            if ($ld.data('user_id').val()) {
+                            	$ld.data('password').focus();
+                            }
+
+                            $ld.trigger('clearMessages');
+                            $ld.unbind('keypress');
+                            $ld.keypress(function(e) {
+                                if (e.keyCode == $.ui.keyCode.ENTER) {
+                                    $('button:last', $ld.parent()).trigger("click");
+                                    e.stopPropagation();
+                                }
+                            });
+                        },
+                        this
+                    ),
+                }
+
+            );
+
+            $ld.bind('error',
+                function(event, msg) {
+                    $(this).trigger('clearMessages');
+                    $(this).data("error").show();
+                    $(this).data("errormsg").html(msg);
+                }
+            );
+
+            $ld.bind('message',
+                function(event, msg) {
+                    $(this).trigger('clearMessages');
+                    $(this).data("pending").show();
+                    $(this).data("pendinguser").html(msg);
+                }
+            );
+
+            $ld.bind('clearMessages',
+                function(event) {
+                    $(this).data("error").hide();
+                    $(this).data("pending").hide();
+                }
+            );
+
+            return $ld;
+        },
+
+        login : function (user_id, password, callback) {
+
+            var args = { user_id : user_id, status : 1 };
+
+            // here's a couple of simple cases that need to be handled somewhere. Figured I'd just toss 'em into this function
+            // to keep 'em all in one place.
+            if (user_id.length == 0) {
+                args.message = 'Cannot login w/o user_id';
+                args.status = 0;
+                callback.call(this, args);
+            } else if (password.length == 0) {
+                args.message = 'Cannot login w/o password';
+                args.status = 0;
+                callback.call(this, args);
+            }
+            else {
+                args.password = password;
+                args.cookie = 1;
+                args.fields = this.options.fields.join(',');
+
+                $.ajax(
+                    {
+                        type            : "POST",
+                        url                : this.options.loginURL,
+                        data            : args,
+                        dataType        : "json",
+                        crossDomain        : true,
+                        xhrFields        : { withCredentials: true },
+                        success            : $.proxy(
+                            function (data,res,jqXHR) {
+
+                                if (data.token) {
+
+									//$.cookie('kbase_session',
+								    //	  'un=' + data.user_id
+									//	+ '|'
+									//	+ 'kbase_sessionid=' + data.kbase_sessionid);
+
+                                    var cookieArray = [];
+
+                                    var args = { success : 1 };//this.get_kbase_cookie();
+                                    var fields = this.options.fields;
+
+                                    for (var i = 0; i < fields.length; i++) {
+                                        args[fields[i]] = data[fields[i]];
+                                        cookieArray.push(fields[i] + '=' + data[fields[i]]);
+                                    }
+
+                                    $.cookie('kbase_session', cookieArray.join('|'));
+
+                                    this.populateLoginInfo(args);
+                                    callback.call(this,args)
+                                }
+                                else {
+                                    $.removeCookie('kbase_session');
+                                    this.populateLoginInfo({});
+                                    callback.call(this, {status : 0, message : data.error_msg});
+                                }
+
+                            },
+                            this
+                        ),
+                        error: $.proxy(
+                            function (jqXHR, textStatus, errorThrown) {
+                                // If we have a useless error message, replace with
+                                // friendly, but useless error message
+                                if (textStatus == "error") {
+                                    textStatus = "Error connecting to KBase login server";
+                                }
+                                this.populateLoginInfo({});
+                                callback.call(this,{ status : 0, message : textStatus })
+                             },
+                             this
+                            ),
+                         xhrFields: {
+                            withCredentials: true
+                         },
+                         beforeSend : function(xhr){
+                            // make cross-site requests
+                            xhr.withCredentials = true;
+                         },
+                   }
+                );
+            }
+        },
+
+        logout: function() {
+
+            $.removeCookie('kbase_session');
+
+            // the rest of this is just housekeeping.
+
+            if (this.specificLogout) {
+                this.specificLogout();
+            }
+
+            this.populateLoginInfo({});
+
+            //automatically prompt to log in again
+            if (this.data('loginDialog') != undefined) {
+                this.data("loginDialog").dialog('open');
+            }
+
+            if (this.options.logout_callback) {
+                this.options.logout_callback.call(this);
+            }
+        }
+
+    });
+
+}( jQuery ) );
