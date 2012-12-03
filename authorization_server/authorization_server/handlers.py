@@ -88,9 +88,9 @@ pp = pprint.PrettyPrinter(indent=4)
 
 class RoleHandler( BaseHandler):
     allowed_methods = ('GET','POST','PUT','DELETE')
-    fields = ('role_id','description','members','read','modify','delete',
-              'impersonate','grant','create','role_owner','role_updater')
-    exclude = ()
+    fields = ['role_id','description','members','read','modify','delete',
+              'impersonate','grant','create','role_owner','role_updater']
+    exclude = []
     # We need to define the appropriate settings and set them here
     try:
         conn = Connection(settings.MONGODB_CONN)
@@ -123,7 +123,8 @@ class RoleHandler( BaseHandler):
                                   'delete' : 'List of kbase object ids (strings) that this role allows delete privs',
                                   'impersonate' : 'List of kbase user_ids (strings) that this role allows impersonate privs',
                                   'grant' : 'List of kbase authz role_ids (strings) that this role allows grant privs',
-                                  'create' : 'Boolean value - does this role provide the create privilege'
+                                  'create' : 'Boolean value - does this role provide the create privilege',
+                                  'owns' : 'List of document_ids that are owned by the role_owner and role_updaters'
                                   },
                   'contact' : { 'email' : 'sychan@lbl.gov'},
                   'usage'   : 'This is a standard REST service. Note that read handler takes ' + 
@@ -165,6 +166,32 @@ class RoleHandler( BaseHandler):
         except:
             return False
 
+    # Given a user_id and document ID, returns true if the user has ownership
+    # privs on the docs
+    # basically is this user in the role_owner or role_updater for
+    # for a role that specifies ownership of this doc_id
+    def owns(self, user_id, doc_id):
+        try:
+            res = self.roles.find_one( { 'owns' : doc_id,
+                                         '$or' : { 'role_owner' : user_id,
+                                                   'role_updater' : user_id }},
+                                       { 'role_id' : 1 } );
+            return res is not None
+        except:
+            # rethrow exception
+            raise
+
+    def can_create_acl( self, doc_id, user_id):
+        try:
+            owners = self.who_owns( doc_id)
+            if user_id in owners:
+                return True
+            else:
+                return False
+        except:
+            raise
+
+
     # Helper function that returns all the groups for a userid
     def get_groups(self, user_id):
         try:
@@ -189,37 +216,55 @@ class RoleHandler( BaseHandler):
                 res = rc.FORBIDDEN
                 res.write(' request not from a member of %s' % self.kbase_users)
             else:
-                if role_id == None and 'role_id' in request.GET:
-                    role_id = request.GET.get('role_id')
-                filter = request.GET.get('filter', None)
-                fields = request.GET.get('fields', None)
-                if fields != None and '_id' not in fields:
-                    exclude.append('_id')
-                    print "Appended id to exclude"
+                # Just send the informational response if we have "about" in query params
                 if 'about' in request.GET:
-                    res = self.help_json
-                elif role_id == None and filter == None:
-                    # list all role_ids
-                    all=self.roles.find()
-                    res = [ all[x]['role_id'] for x in range( all.count())]
-                elif role_id != None:
-                    res = self.roles.find_one( { 'role_id': role_id })
-                    if res != None:
-                        for excl in self.exclude:
-                            if excl in res:
-                                del res[excl]
+                    res = [self.help_json]
                 else:
-                    filter = json.loads(filter)
+                    if role_id == None and 'role_id' in request.GET:
+                        role_id = request.GET.get('role_id')
+                    mongo_filter = {}
+                    mongo_fields = {}
+                    # set the user_id filter if is is specified
+                    user_id = request.GET.get('user_id')
+                    if user_id:
+                        mongo_filter['members'] = user_id
+                    doc_id = request.GET.get('doc_id')
+                    if doc_id:
+                        mongo_filter['grant'] = doc_id
+                        mongo_filter['read'] = doc_id
+                        mongo_filter['create'] = doc_id
+                        mongo_filter['modify'] = doc_id
+                        mongo_filter['modify'] = doc_id
+                        mongo_filter['delete'] = doc_id
+                        mongo_filter['owns'] = doc_id
+                    filter = request.GET.get('filter')
+                    if filter:
+                        filter = json.loads(filter)
+                        mongo_filter.update( filter)
+                    fields = request.GET.get('fields')
                     if fields:
                         fields = json.loads(fields)
-                        match = self.roles.find(filter, fields)
+                        mongo_fields.update( fields )
+                    if fields is not None and '_id' not in fields:
+                        self.exclude.append('_id')
+                    if role_id != None:
+                        mongo_filter['role_id'] = role_id
+                    # Filters and fields should all be built, lets do the query
+
+                    # Sending an empty mongo_fields filters out everything, so if the
+                    # user didn't specify, leave it out
+                    if len(mongo_fields.keys()) == 0:
+                        match = self.roles.find( mongo_filter )
                     else:
-                        match = self.roles.find( filter )
-                    res = [ match[x] for x in range( match.count())]
-                    for x in res:
-                        for excl in self.exclude:
-                            if excl in x:
-                                del x[excl]
+                        match = self.roles.find( mongo_filter, mongo_fields )
+                    if len(mongo_filter.keys()) > 0:
+                        res = [ match[x] for x in range( match.count())]
+                        for x in res:
+                            for excl in self.exclude:
+                                if excl in x:
+                                    del x[excl]
+                    else:
+                        res = [ match[x]['role_id'] for x in range( match.count())]
         except Exception as e:
             res = rc.BAD_REQUEST
             res.write(' error: %s' % e )

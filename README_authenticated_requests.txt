@@ -19,7 +19,7 @@ ubuntu@sychan-temp2:/kb/dev_container/modules/auth$ curl -k -# --user kbasetest:
     "token_type": "Bearer", 
     "user_name": "kbasetest"
 }
-ubuntu@sychan-temp2:/kb/dev_container/modules/auth$ curl -# -H "Authorization: OAuth un=kbasetest|tokenid=3be5a452-0d97-11e2-81d0-12313809f035|expiry=1380831397|client_id=kbasetest|token_type=Bearer|SigningSubject=https://nexus.api.globusonline.org/goauth/keys/efc9fd6e-0ba9-11e2-81d0-12313809f035|sig=7ae1687147d52a5717f5ebc15a64cda67f8648332944220d1e578f847fd1899ed5abd7b7bd4b4e9b568bd959f35517b5722e12f044e173bd23337103643279330b26c897a89e21f44e27ead4bb75ab510dca9f08734b7aa6bc7ab4554821fd70a90a8151f44968cc510e6a64b3b5ff2f7736c199e8a711e151c7422f7d8816db" http://localhost:7039/Roles | python -mjson.tool
+ubuntu@sychan-temp2:/kb/dev_container/modules/auth$ curl -# -H "Authorization: OAuth un=kbasetest|tokenid=3be5a452-0d97-11e2-81d0-12313809f035|expiry=1380831397|client_id=kbasetest|token_type=Bearer|SigningSubject=https://nexus.api.globusonline.org/goauth/keys/efc9fd6e-0ba9-11e2-81d0-12313809f035|sig=7ae1687147d52a5717f5ebc15a64cda67f8648332944220d1e578f847fd1899ed5abd7b7bd4b4e9b568bd959f35517b5722e12f044e173bd23337103643279330b26c897a89e21f44e27ead4bb75ab510dca9f08734b7aa6bc7ab4554821fd70a90a8151f44968cc510e6a64b3b5ff2f7736c199e8a711e151c7422f7d8816db" http://localhost:7039/Roles?about | python -mjson.tool
 ######################################################################## 100.0%
 {
     "contact": {

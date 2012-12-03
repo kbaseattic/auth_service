@@ -103,6 +103,7 @@ class RoleHandlerTest(TestCase):
         self.assertEqual(resp.status_code, 401, "Should reject create without KBase membership")
 
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
+    
         self.assertEqual(resp.status_code, 201, "Should accept creation from legit kbase test user")
         # verify that object was inserted into database properly
         dbobj = self.roles.find( { 'role_id' : testdata['role_id'] } );
@@ -154,7 +155,7 @@ class RoleHandlerTest(TestCase):
         resp = h.get(url+"?about", {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Should accept queries from legit kbase test user")
         respjson = json.loads(resp.content)
-        usage = respjson.get('usage')
+        usage = respjson[0].get('usage')
         self.assertIsNotNone(usage, "Expecting usage message")
 
         resp = h.get(url, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
@@ -166,14 +167,14 @@ class RoleHandlerTest(TestCase):
         resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Querying for kbase_user role from legit kbase test user")
         respjson = json.loads(resp.content)
-        members = respjson.get('members')
+        members = respjson[0].get('members')
         self.assertIsNotNone(members, "Expecting members field")
 
         url2 = "%s?role_id=kbase_users" % url
         resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Querying for kbase_user role from legit kbase test user using GET param")
         respjson = json.loads(resp.content)
-        members = respjson.get('members')
+        members = respjson[0].get('members')
         self.assertIsNotNone(members, "Expecting members field")
 
         # try to query long random role name, expecting no result!
@@ -182,8 +183,7 @@ class RoleHandlerTest(TestCase):
         resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Querying for nonexistent role using kbase test user")
         respjson = json.loads(resp.content)
-        self.assertIsNone(respjson, "Expecting no response")
-
+        self.assertTrue(len(respjson)==0, "Expecting no response")
 
         # try a regex filter search for all possible role_ids
         filter = { "role_id" : { "$regex" : ".*" }}
@@ -193,20 +193,20 @@ class RoleHandlerTest(TestCase):
         self.assertEqual(resp.status_code, 200, "Querying using regex filter")
         respjson = json.loads(resp.content)
         self.assertTrue(len(respjson) > 0, "Expecting multiple responses")
-        fields = list(set(reduce( operator.add,[x.keys() for x in respjson],[] )))
+        fields = list(set(reduce( operator.add,[respjson[x].keys() for x in range(len(respjson))],[] )))
         self.assertTrue( len(fields) > 1, "Expecting a multiple fields in results set")
 
         # try a regex filter search for all possible role_ids, but returning only one field
         filter = { "role_id" : { "$regex" : ".*" }}
         filterjs = json.dumps( filter )
-        fields = { "role_id" : "1" }
+        fields = { "role_id" : "1", "_id" : "1" }
         fieldsjs = json.dumps( fields )
         url2 = "%s?filter=%s&fields=%s" % (url,filterjs,fieldsjs)
         resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Querying using regex filter and field selection")
         respjson = json.loads(resp.content)
         self.assertTrue(len(respjson) > 0, "Expecting multiple responses")
-        fields = list(set(reduce( operator.add,[x.keys() for x in respjson],[] )))
+        fields = list(set(reduce( operator.add,[respjson[x].keys() for x in range(len(respjson))],[] )))
         self.assertEquals( fields,['_id','role_id'], "Expecting two fields, ['_id','role_id'], across all results")
 
         # double check by pulling all records from mongodb and making sure the role_id values match
