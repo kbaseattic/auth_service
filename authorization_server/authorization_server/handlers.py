@@ -244,7 +244,7 @@ class RoleHandler( BaseHandler):
                     self.exclude.append('_id')
                 if role_id != None:
                     mongo_filter['role_id'] = role_id
-                if 'merge' in request.GET:
+                if 'union' in request.GET:
                     merge = True
                 else:
                     merge = False
