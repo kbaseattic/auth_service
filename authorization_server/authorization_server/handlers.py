@@ -68,7 +68,6 @@ http://authorization_host/Roles?filter={ "members" : "sychan"}&fields={"role_id"
 
 http://authorization_host/Roles?filter={ "role_id" : { "$regex" : ".*test.*" }}&fields={ "role_id" : "1" }
 
-
 """
 
 
@@ -166,33 +165,24 @@ class RoleHandler( BaseHandler):
         except:
             return False
 
-    # Given a user_id and document ID, returns true if the user has ownership
+    # Given a user_id and document ID array, returns true if the user has ownership
     # privs on the docs
     # basically is this user in the role_owner or role_updater for
     # for a role that specifies ownership of this doc_id
-    def owns(self, user_id, doc_id):
+    def owns(self, user_id, doc_ids):
         try:
-            res = self.roles.find_one( { 'owns' : doc_id,
-                                         '$or' : { 'role_owner' : user_id,
-                                                   'role_updater' : user_id }},
-                                       { 'role_id' : 1 } );
-            return res is not None
+            
+            owned_docs = self.roles.find( { 'owns' : { '$in' : doc_ids},
+                                            '$or' : { 'role_owner' : user_id,
+                                                      'role_updater' : user_id }},
+                                          { 'owns' : 1 }).distinct("owns");
+            return set(doc_ids) <= set(own_docs)
         except:
             # rethrow exception
             raise
 
-    def can_create_acl( self, doc_id, user_id):
-        try:
-            owners = self.who_owns( doc_id)
-            if user_id in owners:
-                return True
-            else:
-                return False
-        except:
-            raise
-
-
-    # Helper function that returns all the groups for a userid
+    # Helper function that returns all the groups for a userid, used more for
+    # external services than local services
     def get_groups(self, user_id):
         try:
             roles = self.roles.find( { 'members' : user_id }, { 'role_id' : '1' })
@@ -202,14 +192,7 @@ class RoleHandler( BaseHandler):
             logging.error( "Failed to fetch groups for user %s : %s" % ( user_id, e))
             return []
 
-    # Helper function to validate input is in the proper format
-    def validate_input( request ):
-        try:
-            pass
-        except:
-            pass
-        return
-
+    # Main query handler
     def read(self, request, role_id=None):
         try:
             if not request.user.username or not self.check_kbase_user( request.user.username):
@@ -295,6 +278,8 @@ class RoleHandler( BaseHandler):
                 new['description'] = r['description']
                 new['role_owner'] = request.user.username
                 validate(r,self.input_schema)
+                # Verify that the role_owner actually has ownership on the documents being ACL'ed
+                
                 self.roles.insert( new)
                 res = rc.CREATED
             else:
