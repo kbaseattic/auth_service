@@ -200,7 +200,7 @@ class OAuth2Middleware(AuthenticationMiddleware):
             if (200 <= int(res.status)) and ( int(res.status) < 300):
                 profile = json.loads( body)
                 return profile
-            logging.error( body)
+            logging.error( "Request to %s response was %s" % (keyurl,body))
             raise Exception("HTTP", res)
         except Exception, e:
             logging.exception("Error in get_profile.")

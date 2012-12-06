@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.conf import settings
 from nexus import Client
 from pymongo import Connection
+from authorization_server.handlers import RoleHandler
 import pprint
 import json
 import os
@@ -48,6 +49,9 @@ papatoken = get_token( url, "papa","papapa")
 kbusertoken = get_token( url, "kbasetest","@Suite525")
 charset = string.ascii_uppercase + string.digits
 pp = pprint.PrettyPrinter(indent=4)
+
+# Pull in RoleHandler so we can call the dedupe function
+rh = RoleHandler()
 
 class RoleHandlerTest(TestCase):
     """
@@ -112,6 +116,8 @@ class RoleHandlerTest(TestCase):
         del testdatadb['_id']
         # Now we have to convert this to unicode by doing a JSON conversion and then back
         testdata = json.loads(json.dumps( testdata))
+        rh.dedupe( testdata)
+        rh.dedupe( testdatadb)
         self.assertTrue( testdata == testdatadb,"Data in mongodb should equal source testdata - minus _id field")
         data = json.dumps(testdata )
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
@@ -286,6 +292,8 @@ class RoleHandlerTest(TestCase):
         del testdatadb['_id']
         # Now we have to convert this to unicode by doing a JSON conversion and then back
         testdata2 = json.loads(json.dumps( testdata2))
+        rh.dedupe( testdatadb)
+        rh.dedupe( testdata2)
         self.assertTrue( testdata2 == testdatadb,"Data in mongodb should equal source testdata - minus _id field")
 
         # try one more no op update, but the role_id is from the message bodt

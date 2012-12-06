@@ -192,6 +192,18 @@ class RoleHandler( BaseHandler):
             logging.error( "Failed to fetch groups for user %s : %s" % ( user_id, e))
             return []
 
+    # dedupes array entries in the role doc
+    def dedupe( self, doc):
+        try:
+            keys = [ field for field in self.input_schema['properties'].keys()
+                     if self.input_schema['properties'][field]['type'] == 'array']
+            for key in keys:
+                if key in doc:
+                    doc[key] = list(set(doc[key]))
+        except:
+            # Hmmm, something very strange happened, reraise!
+            raise
+
     # Main query handler
     def read(self, request, role_id=None):
         try:
@@ -280,6 +292,7 @@ class RoleHandler( BaseHandler):
                 validate(r,self.input_schema)
                 # Verify that the role_owner actually has ownership on the documents being ACL'ed
                 
+                self.dedupe( new)
                 self.roles.insert( new)
                 res = rc.CREATED
             else:
@@ -306,6 +319,12 @@ class RoleHandler( BaseHandler):
                 res.write(' request not from a member of %s' % self.kbase_users)
             elif role_id == None:
                 role_id = r['role_id']
+            # If addmember is among the URL variables, we are simply appending
+            # a "member" attribute to the existing one, ignore all other entries
+            addmembers = 'addmembers' in request.GET
+            delmembers = 'delmembers' in request.GET
+            if addmembers and delmembers:
+                raise Exception('Cannot use addmembers and delmembers in single request')
             old = self.roles.find_one( { 'role_id': role_id })
             if old != None:
                 if request.user.username == old['role_owner'] or request.user.username in old['role_updater'] :
@@ -315,8 +334,14 @@ class RoleHandler( BaseHandler):
                         res.write( " %s role_owner can only be updated by %s, but request is from user %s" %
                                    (old['role_id'],old['role_owner'], request.user.username))
                     else:
-                        old.update(r)
-                        validate(r,self.input_schema)
+                        if addmembers:
+                            old['members'] = list( set( old['members']) | set(r['members']))
+                        elif delmembers:
+                            old['members'] = list( set(old['members']) - set(r['members']))
+                        else:
+                            validate(r,self.input_schema)
+                            old.update(r)
+                            self.dedupe(old)
                         self.roles.save( old)
                         res = rc.CREATED
                 else:
