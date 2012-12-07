@@ -108,6 +108,14 @@ class RoleHandler( BaseHandler):
         kbase_users = settings.kbase_users
     except AttributeError as e:
         kbase_users = 'kbase_users'
+
+    # Set the role_id specifying which user_ids can create
+    # roles that contain ownership information
+    try:
+        kbase_owners = settings.kbase_owners
+    except AttributeError as e:
+        kbase_owners = 'kbase_users'
+    
     # Help object when queries go to the top level with no search specification
     help_json = { 'id' : 'KBase Authorization',
                   'documentation' : 'https://docs.google.com/document/d/1CTkthDUPwNzMF22maLyNIktI1sHdWPwtd3lJk0aFb20/edit',
@@ -171,7 +179,6 @@ class RoleHandler( BaseHandler):
     # for a role that specifies ownership of this doc_id
     def owns(self, user_id, doc_ids):
         try:
-            
             owned_docs = self.roles.find( { 'owns' : { '$in' : doc_ids},
                                             '$or' : { 'role_owner' : user_id,
                                                       'role_updater' : user_id }},
@@ -239,12 +246,10 @@ class RoleHandler( BaseHandler):
                     self.exclude.append('_id')
                 if role_id != None:
                     mongo_filter['role_id'] = role_id
-                if 'union' in request.GET:
-                    merge = True
-                else:
-                    merge = False
-                # Filters and fields should all be built, lets do the query
+                # Was a merge requested?
+                merge = 'union' in request.GET
 
+                # Filter and fields should all be built, lets do the query
                 # Sending an empty mongo_fields filters out everything, so if the
                 # user didn't specify, leave it out
                 if len(mongo_fields.keys()) == 0:
@@ -284,8 +289,8 @@ class RoleHandler( BaseHandler):
                 res.write(' request not from a member of %s' % self.kbase_users)
             elif self.roles.find( { 'role_id': r['role_id'] }).count() == 0:
                 # Schema validation
-                new = { x : r.get(x,[]) for x in ('read','modify','delete',
-                                                   'impersonate','grant','create','members','role_updater') }
+                new = { x : r.get(x,[]) for x in ('read','modify','delete','impersonate',
+                                                  'grant','create','members','role_updater') }
                 new['role_id'] = r['role_id']
                 new['description'] = r['description']
                 new['role_owner'] = request.user.username
@@ -319,8 +324,8 @@ class RoleHandler( BaseHandler):
                 res.write(' request not from a member of %s' % self.kbase_users)
             elif role_id == None:
                 role_id = r['role_id']
-            # If addmember is among the URL variables, we are simply appending
-            # a "member" attribute to the existing one, ignore all other entries
+            # If (add/del)member is among the URL variables, we are simply adding/deleting
+            # "member" attribute to the existing one, ignore all other entries
             addmembers = 'addmembers' in request.GET
             delmembers = 'delmembers' in request.GET
             if addmembers and delmembers:
@@ -334,6 +339,8 @@ class RoleHandler( BaseHandler):
                         res.write( " %s role_owner can only be updated by %s, but request is from user %s" %
                                    (old['role_id'],old['role_owner'], request.user.username))
                     else:
+                        # addmembers/delmembers coerces the members field into a set, so
+                        # it is okay to have members as either a string or an array
                         if addmembers:
                             old['members'] = list( set( old['members']) | set(r['members']))
                         elif delmembers:
@@ -368,17 +375,18 @@ class RoleHandler( BaseHandler):
                 res.write(' request not from a member of %s' % self.kbase_users)
             elif role_id is None:
                 raise KeyError('No role_id specified')
-            old = self.roles.find_one( { 'role_id': role_id })
-            if old != None:
-                if request.user.username == old['role_owner']:
-                    self.roles.remove( { '_id' : old['_id'] }, safe=True)
-                    res = rc.DELETED
-                else:
-                    res = rc.FORBIDDEN
-                    res.write( " %s is owned by %s, but request is from user %s" %
-                               (old['role_id'],old['role_owner'], request.user.username))
             else:
-                res = rc.NOT_HERE
+                old = self.roles.find_one( { 'role_id': role_id })
+                if old != None:
+                    if request.user.username == old['role_owner']:
+                        self.roles.remove( { '_id' : old['_id'] }, safe=True)
+                        res = rc.DELETED
+                    else:
+                        res = rc.FORBIDDEN
+                        res.write( " %s is owned by %s, but request is from user %s" %
+                                   (old['role_id'],old['role_owner'], request.user.username))
+                else:
+                    res = rc.NOT_HERE
         except KeyError as e:
             res = rc.BAD_REQUEST
             res.write(' role_id must be specified')

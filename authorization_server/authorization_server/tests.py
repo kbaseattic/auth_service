@@ -84,6 +84,13 @@ class RoleHandlerTest(TestCase):
                           "members": ["sychan","kbasetest","kbauthorz"],
                           "delete": []
                           }
+        # clear out any cruft from previous unittest runs
+        self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
+
+    def tearDown(self):
+        # clear out any cruft from current unittest run
+        self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
+
 
     def testCreate(self):
         h = self.client
