@@ -180,13 +180,25 @@ class RoleHandler( BaseHandler):
     def owns(self, user_id, doc_ids):
         try:
             owned_docs = self.roles.find( { 'owns' : { '$in' : doc_ids},
-                                            '$or' : { 'role_owner' : user_id,
-                                                      'role_updater' : user_id }},
+                                            '$or' :  [ {'role_owner' : user_id },
+                                                       {'role_updater' : user_id} ]},
                                           { 'owns' : 1 }).distinct("owns");
-            return set(doc_ids) <= set(own_docs)
+            return set(doc_ids) <= set(owned_docs)
         except:
             # rethrow exception
             raise
+
+    # Check to see if the documents have no ownership assignments
+    def no_owners(self, doc_ids):
+        try:
+            owners = self.roles.find( { 'owns' : { '$in' : doc_ids}},
+                                      { 'role_owner' : 1,
+                                        'role_updater' : 1 })
+            return owners.count() == 0
+        except:
+            # rethrow exception
+            raise
+
 
     # Helper function that returns all the groups for a userid, used more for
     # external services than local services
@@ -290,14 +302,24 @@ class RoleHandler( BaseHandler):
             elif self.roles.find( { 'role_id': r['role_id'] }).count() == 0:
                 # Schema validation
                 new = { x : r.get(x,[]) for x in ('read','modify','delete','impersonate',
-                                                  'grant','create','members','role_updater') }
+                                                  'grant','create','members','role_updater','owns') }
                 new['role_id'] = r['role_id']
                 new['description'] = r['description']
                 new['role_owner'] = request.user.username
                 validate(r,self.input_schema)
-                # Verify that the role_owner actually has ownership on the documents being ACL'ed
-                
                 self.dedupe( new)
+                # Verify that the role_owner actually has ownership on the documents being ACL'ed
+                doc_ids = set(new.get('read',[]) + new.get('create',[]) +
+                              new.get('modify',[]) + new.get('delete',[]))
+                # is this an initial ownership assertion?
+                own_ids = new.get('owns', [])
+                if own_ids != [] and not self.no_owners(own_ids):
+                    raise Exception( "Some of the documents in the own clause already have owners")
+                # if we had a new claim of ownership, then subtract them from the list of documents
+                # that we're going to check ownership for
+                doc_ids = doc_ids - set(own_ids)
+                if not self.owns( new['role_owner'], list(doc_ids)):
+                    raise Exception( "You do not have ownership privileges on all of these doc_ids: %s" % ",".join(list(doc_ids)))
                 self.roles.insert( new)
                 res = rc.CREATED
             else:

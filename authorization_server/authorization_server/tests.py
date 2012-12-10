@@ -82,7 +82,8 @@ class RoleHandlerTest(TestCase):
                           "role_id": "unittest_",
                           "impersonate": [],
                           "members": ["sychan","kbasetest","kbauthorz"],
-                          "delete": []
+                          "delete": [],
+                          "owns": []
                           }
         # clear out any cruft from previous unittest runs
         self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
@@ -125,6 +126,8 @@ class RoleHandlerTest(TestCase):
         testdata = json.loads(json.dumps( testdata))
         rh.dedupe( testdata)
         rh.dedupe( testdatadb)
+        #print "testdata = %s" % pp.pformat( testdata)
+        #print "testdatadb = %s" % pp.pformat( testdatadb)
         self.assertTrue( testdata == testdatadb,"Data in mongodb should equal source testdata - minus _id field")
         data = json.dumps(testdata )
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
