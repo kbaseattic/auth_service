@@ -59,7 +59,7 @@
             loginURL : "{{base_url}}{% url session.login-handler %}",
             login_button_options : {label : 'Login'},
 	    possibleFields : [{{all_fields|safe}}],
-            fields : ['fullname', 'kbase_sessionid', 'user_id'],
+            fields :  ['name', 'kbase_sessionid', 'user_id','email','token'],
         },
 
     get_kbase_cookie : function () {
