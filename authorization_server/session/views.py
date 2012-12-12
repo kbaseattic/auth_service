@@ -82,7 +82,7 @@ field_rename = { "username" : "user_id",
 
 # Default fields to return in body of response when
 # logging in. CSV of the fieldnames
-default_fields = 'user_id,name,email,groups'
+default_fields = 'user_id,name,email,groups,kbase_sessionid'
 
 # List of fields that we fetch from GO
 GO_fields = ",".join(field_rename.keys())
@@ -254,13 +254,19 @@ def login(request):
             }
         password = request.POST.get('password')
         cookie = request.POST.get('cookie')
+        # Accept a token in lieu of a user_id, password to generate a session
+        # for a user that has already logged in
+        token = request.POST.get('token')
         # Session lifetime for mongodb sessions. Default set in settings file
         lifetime = request.POST.get('lifetime',session_lifetime)
         fields = request.POST.get('fields',default_fields)
-        if (response['user_id'] is not None and password is not None):
-            url = authsvc + "goauth/token?grant_type=client_credentials"
+        if (token is not None or (response['user_id'] is not None and password is not None)):
             try:
-                response['token'] = get_nexus_token( url, response['user_id'],password)
+                if token:
+                    response['token'] = token
+                else:
+                    url = authsvc + "goauth/token?grant_type=client_credentials"
+                    response['token'] = get_nexus_token( url, response['user_id'],password)
                 token_map = {}
                 for entry in response['token'].split('|'):
                     key, value = entry.split('=')
@@ -275,7 +281,7 @@ def login(request):
                 for key in delkeys:
                     del response[key]
             except Exception as e:
-                response['error_msg'] = "%s" % e
+                    response['error_msg'] = "%s" % e
         else:
             response['error_msg'] = "Must specify user_id and password in POST message body"
         if cookie == "only":
