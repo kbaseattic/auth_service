@@ -76,6 +76,7 @@ from piston.utils import rc,require_mime
 import pprint
 import datetime
 import json
+import copy
 from jsonschema import validate
 from pymongo import Connection
 from piston.resource import Resource
@@ -162,12 +163,28 @@ class RoleHandler( BaseHandler):
                                       }
                      }
 
+    # Schema used for updates
+    update_schema = copy.deepcopy(input_schema)
+    update_schema['properties']['description'] = { 'type' : 'string'}
+
     # Check mongodb to see if the user is in kbase_user role, necessary
     # before they can perform any kinds of updates
     # Note that possessing a Globus Online ID is not sufficient
     def check_kbase_user(self, user_id):
         try:
             res = self.roles.find_one( { 'role_id' : self.kbase_users,
+                                         'members' : user_id })
+            return res is not None
+        except:
+            return False
+
+
+    # Check mongodb to see if the user is in kbase_user role, necessary
+    # before they can perform any kinds of updates
+    # Note that possessing a Globus Online ID is not sufficient
+    def check_kbase_owners(self, user_id):
+        try:
+            res = self.roles.find_one( { 'role_id' : self.kbase_owners,
                                          'members' : user_id })
             return res is not None
         except:
@@ -287,6 +304,21 @@ class RoleHandler( BaseHandler):
             res.write(' error: %s' % e )
         return(res)
 
+    # Verify that the role_owner actually has ownership on the documents being ACL'ed
+    def ownership_legit( self, doc, user_id):
+        doc_ids = set(doc.get('read',[]) + doc.get('create',[]) +
+                      doc.get('modify',[]) + doc.get('delete',[]))
+        # is this an initial ownership assertion?
+        own_ids = doc.get('owns', [])
+        if own_ids != [] and not self.no_owners(own_ids):
+            raise Exception( "Some of the documents in the own clause already have owners")
+        # if we had a new claim of ownership, then subtract them from the list of documents
+        # that we're going to check ownership for
+        doc_ids = doc_ids - set(own_ids)
+        if not self.owns( user_id, list(doc_ids)):
+            raise Exception( "You do not have ownership privileges on all of these doc_ids: %s" % ",".join(list(doc_ids)))
+        return True
+
     
     @method_decorator(csrf_exempt)
     @require_mime('json')
@@ -308,18 +340,16 @@ class RoleHandler( BaseHandler):
                 new['role_owner'] = request.user.username
                 validate(r,self.input_schema)
                 self.dedupe( new)
+
+                # Verify that the current user actually has privs to set ownership
+                # on documents at all
+                if new['owns'] != [] and not self.check_kbase_owners( request.user.username):
+                    raise Exception( "You must be a member of the kbase_owners group in order to set ownership of documents")
                 # Verify that the role_owner actually has ownership on the documents being ACL'ed
-                doc_ids = set(new.get('read',[]) + new.get('create',[]) +
-                              new.get('modify',[]) + new.get('delete',[]))
-                # is this an initial ownership assertion?
-                own_ids = new.get('owns', [])
-                if own_ids != [] and not self.no_owners(own_ids):
-                    raise Exception( "Some of the documents in the own clause already have owners")
-                # if we had a new claim of ownership, then subtract them from the list of documents
-                # that we're going to check ownership for
-                doc_ids = doc_ids - set(own_ids)
-                if not self.owns( new['role_owner'], list(doc_ids)):
-                    raise Exception( "You do not have ownership privileges on all of these doc_ids: %s" % ",".join(list(doc_ids)))
+                try:
+                    self.ownership_legit( new, new['role_owner'])
+                except:
+                    raise
                 self.roles.insert( new)
                 res = rc.CREATED
             else:
@@ -368,15 +398,21 @@ class RoleHandler( BaseHandler):
                         elif delmembers:
                             old['members'] = list( set(old['members']) - set(r['members']))
                         else:
-                            validate(r,self.input_schema)
+                            validate(r,self.update_schema)
+                            # Verify that the current user actually has privs to set ownership
+                            # on documents at all
+                            if r['owns'] != [] and not self.check_kbase_owners( request.user.username):
+                                raise Exception( "You must be a member of the %s group in order to set ownership of documents" %
+                                                 self.kbase_owners)
                             old.update(r)
                             self.dedupe(old)
+                            self.ownership_legit(old, request.user.username)
                         self.roles.save( old)
                         res = rc.CREATED
                 else:
                     res = rc.FORBIDDEN
                     res.write( " %s is owned by %s and updated by %s, but request is from user %s" %
-                               (old['role_id'],old['role_owner'], pp.pformat(old['role_updater']), request.user.username))
+                               (old['role_id'],old['role_owner'], pp.pformat(old['role_updater']),request.user.username))
             else:
                 res = rc.NOT_HERE
         except KeyError as e:

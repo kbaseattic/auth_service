@@ -85,8 +85,19 @@ class RoleHandlerTest(TestCase):
                           "delete": [],
                           "owns": []
                           }
+        self.test_docid = "doc_" + "".join(random.sample(charset,10))
         # clear out any cruft from previous unittest runs
         self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
+        # insert a test record for unittesting
+        testdata=dict(self.testdata)
+        testdata['role_id'] += "".join(random.sample(charset,10))
+        self.test_role_id = testdata['role_id']
+        testdata['read'] = [self.test_docid]
+        testdata['delete'] = [self.test_docid]
+        testdata['modify'] = [self.test_docid]
+        testdata['create'] = [self.test_docid]
+        testdata['owns'] = [self.test_docid]
+        self.roles.insert( testdata)
 
     def tearDown(self):
         # clear out any cruft from current unittest run
@@ -101,9 +112,23 @@ class RoleHandlerTest(TestCase):
         testdata['role_id'] += "".join(random.sample(charset,10))
         id = testdata['role_id']
 
+        testdata2 = dict(self.testdata)
+        testdata2['role_id'] += "".join(random.sample(charset,10))
+
+        testdata3 = dict(self.testdata)
+        testdata3['role_id'] += "".join(random.sample(charset,10))
+
         dbobj = self.roles.find( { 'role_id' : testdata['role_id'] } );
         if dbobj.count() != 0:
             self.roles.remove( { 'role_id' : testdata['role_id'] } )
+
+        dbobj = self.roles.find( { 'role_id' : testdata2['role_id'] } );
+        if dbobj.count() != 0:
+            self.roles.remove( { 'role_id' : testdata2['role_id'] } )
+
+        dbobj = self.roles.find( { 'role_id' : testdata3['role_id'] } );
+        if dbobj.count() != 0:
+            self.roles.remove( { 'role_id' : testdata3['role_id'] } )
 
         data = json.dumps(testdata )
 
@@ -153,10 +178,32 @@ class RoleHandlerTest(TestCase):
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
         self.assertEqual(resp.status_code, 400, "Should refuse creation")
         self.assertTrue(resp.content.count('description') >= 1, "Should call out description as missing field")
-        
+
+        # try to insert a role without ownership of the documents
+        testdata2['read'] = [ "doc_" + "".join(random.sample(charset,10))]
+        data = json.dumps(testdata2 )
+        resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
+        self.assertEqual(resp.status_code, 400, "Should refuse creation")
+        self.assertTrue(resp.content.count('ownership privileges') >= 1, "Should call out ownership privilege issue")
+
+        # add an owns clause and retry
+        testdata2['owns'] = testdata2['read']
+        data = json.dumps(testdata2 )
+        resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
+        self.assertEqual(resp.status_code, 201, "Should allow creation with owns clause")
+
+        # One more role that references docs with immediate and external owns clauses
+        testdata3['owns'] = [ "doc_" + "".join(random.sample(charset,10))]
+        testdata3['read'] = testdata2['owns']
+        testdata3['delete'] = testdata2['owns'] + testdata3['owns']
+        data = json.dumps(testdata3 )
+        resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
+        self.assertEqual(resp.status_code, 201, "Should allow creation with immediate and external owns clauses")
 
         # Remove the database record directly
         self.roles.remove( { 'role_id' : id } )
+        self.roles.remove( { 'role_id' : testdata2['role_id'] } )
+        self.roles.remove( { 'role_id' : testdata3['role_id'] } )
 
     def testRead(self):
         h = self.client
@@ -233,6 +280,45 @@ class RoleHandlerTest(TestCase):
         role_idsdb.sort()
         self.assertEquals( role_ids, role_idsdb, "Should get identical results from pymongo query and REST interface query")
 
+        # Perform query using the user_id param and verify against mongodb
+        url2 = "%s?user_id=kbasetest" % url
+        resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
+        self.assertEqual(resp.status_code, 200, "Querying for roles with user_id=kbasetest using GET param")
+        respjson = json.loads(resp.content)
+        role_ids = [x['role_id'] for x in respjson]
+        role_ids.sort()
+        filter = { 'members' : 'kbasetest' }
+        fields = { 'role_id' : 1 }
+        dbroles = self.roles.find( filter, fields)
+        role_idsdb = [x['role_id'] for x in dbroles]
+        role_idsdb.sort()
+        self.assertEquals( role_ids, role_idsdb, "Should get identical results from pymongo query and user_id=kbasetest query")
+
+        # Perform query using the doc_id param and verify against sample doc_id
+        url2 = "%s?doc_id=%s" % (url,self.test_docid)
+        resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
+        self.assertEqual(resp.status_code, 200, "Querying for roles with doc_id=%s using GET param" % self.test_docid)
+        respjson = json.loads(resp.content)
+        self.assertTrue( len(respjson) == 1, "Should get single result matching random doc_id from test suite")
+        self.assertEquals( respjson[0]['role_id'], self.test_role_id, "Should get matching role_ids for doc_id query")
+
+        # Perform query using the union and user_id parameters and verify against mongodb
+        url2 = "%s?user_id=kbasetest&union=" % url
+        resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
+        self.assertEqual(resp.status_code, 200, "Querying for roles with user_id=kbasetest using GET param")
+        respjson = json.loads(resp.content)
+        self.assertEquals( len(respjson), 1, "Should be only a single result from union query")
+        role_ids = set(respjson[0]['role_id'].split(','))
+        filter = { 'members' : 'kbasetest' }
+        dbroles = list(self.roles.find( filter))
+        # Compare results - check the role_ids and then the contents
+        role_idsdb = set([x['role_id'] for x in dbroles])
+        self.assertTrue( role_ids == role_idsdb, "Should get identical role_ids from pymongo and user_id=kbasetest&union=query")
+        merged=dict()
+        for acls in ('grant','read','create','modify','delete','owns','members'):
+            merged[acls] = reduce( set.union, [ set(x.get(acls,[])) for x in dbroles])
+            self.assertTrue( merged[acls] == set(respjson[0][acls]), "Should get identical %s ACL from pymongo and user_id=kbasetest&union= query" % acls)
+
     def testUpdate(self):
         h = self.client
         url = "/Roles/"
@@ -280,15 +366,25 @@ class RoleHandlerTest(TestCase):
         testdata2['create'] = ['bugsbunny','roadrunner']
         jdata = json.dumps( testdata2)
 
-        # try again, should allow update
+        # try again, should deny update because of ownership
         resp = h.put( url_roleid, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
-        self.assertEqual(resp.status_code, 201, "Should accept update")
+        self.assertEqual(resp.status_code, 400, "Should deny update")
+
+        # try again, set ownership which should allow update
+        testdata_no_own = dict( testdata2)
+        testdata2['owns'] = testdata2['create']
+        jdata = json.dumps( testdata2)
+        resp = h.put( url_roleid, jdata, content_type="application/json",
+                     HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        self.assertEqual(resp.status_code, 201, "Should allow update")
 
 
         # try again but try to reset role_owner, should deny update
         testdata3 = dict(testdata2)
         testdata3['role_owner'] = "bugsbunny"
+        # clear the ownership assertion
+        testdata3['owns'] = []
         jdata3 = json.dumps(testdata3)
         resp = h.put( url_roleid, jdata3, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
@@ -306,7 +402,8 @@ class RoleHandlerTest(TestCase):
         rh.dedupe( testdata2)
         self.assertTrue( testdata2 == testdatadb,"Data in mongodb should equal source testdata - minus _id field")
 
-        # try one more no op update, but the role_id is from the message bodt
+        # try one more no op update, but the role_id is from the message body
+        jdata = json.dumps( testdata_no_own)
         resp = h.put( url, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
         self.assertEqual(resp.status_code, 201, "Should accept update")

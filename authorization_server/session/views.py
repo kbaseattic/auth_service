@@ -254,6 +254,7 @@ def login(request):
             }
         password = request.POST.get('password')
         cookie = request.POST.get('cookie')
+        sessiondoc = dict()
         # Accept a token in lieu of a user_id, password to generate a session
         # for a user that has already logged in
         token = request.POST.get('token')
@@ -261,27 +262,26 @@ def login(request):
         lifetime = request.POST.get('lifetime',session_lifetime)
         fields = request.POST.get('fields',default_fields)
         if (token is not None or (response['user_id'] is not None and password is not None)):
-            try:
-                if token:
-                    response['token'] = token
-                else:
-                    url = authsvc + "goauth/token?grant_type=client_credentials"
-                    response['token'] = get_nexus_token( url, response['user_id'],password)
-                token_map = {}
-                for entry in response['token'].split('|'):
-                    key, value = entry.split('=')
-                    token_map[key] = value
-                response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
-                profile = get_profile(response['token'])
-                custom_fields = profile.get( 'custom_fields',{})
-                del profile['custom_fields']
-                profile.update(custom_fields)
-                response.update(profile)
-                delkeys = set(response.keys()) - set( fields.split(","))
-                for key in delkeys:
-                    del response[key]
-            except Exception as e:
-                    response['error_msg'] = "%s" % e
+            if not token:
+                url = authsvc + "goauth/token?grant_type=client_credentials"
+                token = get_nexus_token( url, response['user_id'],password)
+            token_map = {}
+            for entry in response['token'].split('|'):
+                key, value = entry.split('=')
+                token_map[key] = value
+            response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
+            profile = get_profile(response['token'])
+            if not profile:
+                raise Exception( "Failed to fetch profile with token")
+            response['token'] = token
+            custom_fields = profile.get( 'custom_fields',{})
+            del profile['custom_fields']
+            profile.update(custom_fields)
+            response.update(profile)
+            sessiondoc=dict(response)
+            delkeys = set(response.keys()) - set( fields.split(","))
+            for key in delkeys:
+                del response[key]
         else:
             response['error_msg'] = "Must specify user_id and password in POST message body"
         if cookie == "only":
@@ -290,19 +290,19 @@ def login(request):
             HTTPres = HttpResponse(json.dumps(response), mimetype="application/json")
         # Push the session into the database if there was a sessionid generated
         if 'kbase_sessionid' in response:
-            response['creation'] = datetime.now()
-            response['expiration'] = datetime.now() + timedelta(seconds = lifetime)
+            sessiondoc['creation'] = datetime.now()
+            sessiondoc['expiration'] = datetime.now() + timedelta(seconds = lifetime)
             x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
             if x_forwarded_for:
-                response['client_ip'] = x_forwarded_for.split(',')[-1].strip()
+                sessiondoc['client_ip'] = x_forwarded_for.split(',')[-1].strip()
             else:
-                response['client_ip'] = request.META.get('REMOTE_ADDR')
-            sessiondb.insert(response)
+                sessiondoc['client_ip'] = request.META.get('REMOTE_ADDR')
+            sessiondb.insert(sessiondoc)
             # Expire old sessions
             sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
             # Convert the datetime objects to string representations
-            response['creation'] = "%s" % response['creation']
-            response['expiration'] = "%s" % response['expiration']
+            response['creation'] = "%s" % sessiondoc['creation']
+            response['expiration'] = "%s" % sessiondoc['expiration']
         # Enable some basic CORS support
         HTTPres['Access-Control-Allow-Credentials'] = 'true'
         try:
@@ -310,8 +310,8 @@ def login(request):
         except Exception as e:
             HTTPres['Access-Control-Allow-Origin'] = "*"
         # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
-        if cookie is not None and 'kbase_sessionid' in response:
-            cookie = "un=%s|kbase_sessionid=%s" % (response['user_id'],response['kbase_sessionid'])
+        if cookie is not None and 'kbase_sessionid' in sessiondoc:
+            cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
     except Exception, e:
         response['error_msg'] = "%s" % e
