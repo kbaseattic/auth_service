@@ -418,12 +418,35 @@ class RoleHandlerTest(TestCase):
         self.assertEqual(resp.status_code, 201, "Should accept update")
 
         # try one more no op update, but with no role_id specified
+        role_id = testdata2['role_id']
         del testdata2['role_id']
         jdata = json.dumps( testdata2)
         resp = h.put( url, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
         self.assertEqual(resp.status_code, 400, "Should decline update without role_id")
 
+        # test out the addmember and delmember functions
+        url2 = "%s?addmembers=" % url
+        jdata = json.dumps( { 'role_id' : role_id,
+                              'members' : [ 'captainkirk', 'tweetybird']})
+        resp = h.put( url2, jdata, content_type="application/json",
+                     HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        print resp.content
+        self.assertEqual(resp.status_code, 201, "Should accept addmembers")
+
+        # test out the addmember and delmember functions
+        url2 = "%s?delmembers=" % url
+        resp = h.put( url2, jdata, content_type="application/json",
+                     HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        print resp.content
+        self.assertEqual(resp.status_code, 201, "Should accept delmembers")
+
+        # test out the addmember and delmember functions
+        url2 = "%s?delmembers=&addmembers=" % url
+        resp = h.put( url2, jdata, content_type="application/json",
+                     HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        self.assertEqual(resp.status_code, 400, "Should reject simultaneous addmembers and delmembers")
+        self.assertTrue(resp.content.count('addmembers and delmembers') >= 1, "Should call out conflicting options")
 
         self.roles.remove( { '_id' : id }, safe=True)
         
