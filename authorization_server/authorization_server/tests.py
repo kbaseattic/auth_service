@@ -200,6 +200,15 @@ class RoleHandlerTest(TestCase):
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
         self.assertEqual(resp.status_code, 201, "Should allow creation with immediate and external owns clauses")
 
+        # try to add one more role that claims ownership of a doc that is already owned
+        testdata4 = dict(self.testdata)
+        testdata4['role_id'] += "".join(random.sample(charset,10))
+        testdata4['owns'] = testdata3['owns']
+        data = json.dumps(testdata4 )
+        resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
+        self.assertEqual(resp.status_code, 400, "Should deny creation of role that re-owns a document")
+        self.assertTrue(resp.content.count('already have owners') >= 1, "Should call out existing owners")
+
         # Remove the database record directly
         self.roles.remove( { 'role_id' : id } )
         self.roles.remove( { 'role_id' : testdata2['role_id'] } )
