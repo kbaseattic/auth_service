@@ -258,6 +258,7 @@ def login(request):
         # Accept a token in lieu of a user_id, password to generate a session
         # for a user that has already logged in
         token = request.POST.get('token')
+        print "Token is %s" % token
         # Session lifetime for mongodb sessions. Default set in settings file
         lifetime = request.POST.get('lifetime',session_lifetime)
         fields = request.POST.get('fields',default_fields)
@@ -265,6 +266,7 @@ def login(request):
             if not token:
                 url = authsvc + "goauth/token?grant_type=client_credentials"
                 token = get_nexus_token( url, response['user_id'],password)
+            response['token'] = token
             token_map = {}
             for entry in response['token'].split('|'):
                 key, value = entry.split('=')
@@ -314,6 +316,6 @@ def login(request):
             cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
     except Exception, e:
-        response['error_msg'] = "%s" % e
+        response['error_msg'] = "%s exception: %s" % (type(e).__name__,e)
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
     return HTTPres
