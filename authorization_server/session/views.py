@@ -315,5 +315,5 @@ def login(request):
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
     except Exception, e:
         response['error_msg'] = "%s" % e
-        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 200)
     return HTTPres
