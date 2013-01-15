@@ -312,3 +312,4 @@ def login(request):
         response['error_msg'] = "%s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
     return HTTPres
+
