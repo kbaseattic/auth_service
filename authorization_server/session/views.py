@@ -258,7 +258,6 @@ def login(request):
         # Accept a token in lieu of a user_id, password to generate a session
         # for a user that has already logged in
         token = request.POST.get('token')
-        print "Token is %s" % token
         # Session lifetime for mongodb sessions. Default set in settings file
         lifetime = request.POST.get('lifetime',session_lifetime)
         fields = request.POST.get('fields',default_fields)
@@ -307,17 +306,13 @@ def login(request):
             response['expiration'] = "%s" % sessiondoc['expiration']
         # Enable some basic CORS support
         HTTPres['Access-Control-Allow-Credentials'] = 'true'
-#        try:
-#            HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
-#        except Exception as e:
-#            HTTPres['Access-Control-Allow-Origin'] = "*"
         HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
         # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
         if cookie is not None and 'kbase_sessionid' in sessiondoc:
             cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
     except Exception, e:
-        if type(e)__name__ != "Exception" :
+        if type(e).__name__ != "Exception" :
             response['error_msg'] = "%s e: %s" % (type(e).__name__,e)
         else:
             response['error_msg'] = "Exception: %s" % e
