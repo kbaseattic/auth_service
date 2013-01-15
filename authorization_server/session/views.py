@@ -319,3 +319,4 @@ def login(request):
         response['error_msg'] = "%s exception: %s" % (type(e).__name__,e)
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
     return HTTPres
+
