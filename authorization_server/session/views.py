@@ -16,6 +16,7 @@ from django.conf import settings
 from nexus import Client
 from pymongo import Connection
 from authorization_server.handlers import RoleHandler
+import xml.etree.ElementTree as ET
 
 # Authentication server
 
@@ -115,7 +116,7 @@ def get_profile(token):
         return profile2
     logging.error( body)
     if int(res.status) == 401 or int(res.status) == 403:
-        raise AuthFailure( "login failure - %s" % body)
+        raise AuthFailure( "Error fetching profile with token - %s" % ET.fromstring(body).find("title").text)
     else:
         raise Exception("HTTP", res)
 
@@ -169,17 +170,11 @@ def login_js(request):
     base_url = get_baseurl(request)
     login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url,
                                                                            'all_fields' : all_fields})
-    # Enable some basic CORS support
-    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
 
 def login_form(request):
     login_form = django.template.loader.render_to_string('login-form.html',{})
     HTTPres = HttpResponse( login_form)
-    # Enable some basic CORS support
-    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
 
 
@@ -209,9 +204,6 @@ def exists(request):
         response['error_msg'] = error
         retcode = 500
     HTTPres = HttpResponse( json.dumps(response), mimetype="application/json", status = retcode)
-    # Enable some basic CORS support
-    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
         
 def logout(request):
@@ -244,10 +236,9 @@ def logout(request):
     except Exception, e:
         HTTPres = HttpResponse( json.dumps({ 'error_msg' : "%s" % e}),
                                 mimetype="application/json",status=400)
-    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
-        
+
+# Main handler to take care logins using either username/password or an existing token        
 def login(request):
     try:
         response = {
@@ -266,15 +257,14 @@ def login(request):
             if not token:
                 url = authsvc + "goauth/token?grant_type=client_credentials"
                 token = get_nexus_token( url, response['user_id'],password)
-            response['token'] = token
             token_map = {}
-            for entry in response['token'].split('|'):
+            for entry in token.split('|'):
                 key, value = entry.split('=')
                 token_map[key] = value
-            response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
-            profile = get_profile(response['token'])
+            profile = get_profile(token)
             if not profile:
-                raise Exception( "Failed to fetch profile with token")
+                raise AuthFailure( "Failed to fetch profile with token")
+            response['kbase_sessionid'] = hashlib.sha256(token_map['sig']+salt).hexdigest()
             response['token'] = token
             custom_fields = profile.get( 'custom_fields',{})
             del profile['custom_fields']
@@ -285,7 +275,7 @@ def login(request):
             for key in delkeys:
                 del response[key]
         else:
-            response['error_msg'] = "Must specify user_id and password in POST message body"
+            raise AuthFailure( "Must specify user_id and password in POST message body")
         if cookie == "only":
             HTTPres = HttpResponse()
         else:
@@ -318,8 +308,5 @@ def login(request):
         else:
             response['error_msg'] = "Exception: %s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 200)
-    # Enable some basic CORS support
-    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
     return HTTPres
 
