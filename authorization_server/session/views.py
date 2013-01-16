@@ -95,27 +95,29 @@ tmp.add('token')
 tmp.add('kbase_sessionid')
 all_fields = ",".join([ '\'%s\'' % x for x in tmp])
 
+class AuthFailure( Exception ):
+    pass
+
 def get_profile(token):
-    try:
-        token_map = {}
-        for entry in token.split('|'):
-            key, value = entry.split('=')
-            token_map[key] = value
-        keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=%s" % GO_fields
-        res,body = http.request(keyurl,"GET",
-                                headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
-        if (200 <= int(res.status)) and ( int(res.status) < 300):
-            profile = json.loads( body)
-            # rename the fields to match
-            profile2 = { field_rename[key] : profile[ key ] for key in field_rename.keys() }
-            profile2['groups'] = role_handler.get_groups( profile2['user_id'])
-            # strip out unrequested fields
-            return profile2
-        logging.error( body)
+    token_map = {}
+    for entry in token.split('|'):
+        key, value = entry.split('=')
+        token_map[key] = value
+    keyurl = authsvc + "/users/" + token_map['un'] + "?custom_fields=*&fields=%s" % GO_fields
+    res,body = http.request(keyurl,"GET",
+                            headers={ 'Authorization': 'Globus-Goauthtoken ' + token })
+    if (200 <= int(res.status)) and ( int(res.status) < 300):
+        profile = json.loads( body)
+        # rename the fields to match
+        profile2 = { field_rename[key] : profile[ key ] for key in field_rename.keys() }
+        profile2['groups'] = role_handler.get_groups( profile2['user_id'])
+        # strip out unrequested fields
+        return profile2
+    logging.error( body)
+    if int(res.status) == 401 or int(res.status) == 403:
+        raise AuthFailure( "login failure - %s" % body)
+    else:
         raise Exception("HTTP", res)
-    except Exception, e:
-        logging.exception("Error in get_profile: %s" % e)
-        return None
 
 def get_nexus_token( url, user_id, password):
     h = httplib2.Http(disable_ssl_certificate_validation=True)
@@ -130,6 +132,8 @@ def get_nexus_token( url, user_id, password):
     tok = json.loads(content)
     if status>=200 and status<=299:
         return tok['access_token']
+    elif status == 401 or status == 403:
+        raise AuthFailure( "%s" % tok['message'])
     else:
         raise Exception(tok['message'])
 
@@ -165,22 +169,17 @@ def login_js(request):
     base_url = get_baseurl(request)
     login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url,
                                                                            'all_fields' : all_fields})
-    HTTPres = HttpResponse( login_js, content_type = "text/javascript")
-    try:
-        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
-    except Exception as e:
-        HTTPres['Access-Control-Allow-Origin'] = "*"
+    # Enable some basic CORS support
+    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
 
 def login_form(request):
     login_form = django.template.loader.render_to_string('login-form.html',{})
     HTTPres = HttpResponse( login_form)
     # Enable some basic CORS support
-    HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    try:
-        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
-    except Exception as e:
-        HTTPres['Access-Control-Allow-Origin'] = "*"
+    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
 
 
@@ -209,7 +208,11 @@ def exists(request):
         logging.error( error)
         response['error_msg'] = error
         retcode = 500
-    return HttpResponse( json.dumps(response), mimetype="application/json", status = retcode)
+    HTTPres = HttpResponse( json.dumps(response), mimetype="application/json", status = retcode)
+    # Enable some basic CORS support
+    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
+    return HTTPres
         
 def logout(request):
     try:
@@ -241,10 +244,8 @@ def logout(request):
     except Exception, e:
         HTTPres = HttpResponse( json.dumps({ 'error_msg' : "%s" % e}),
                                 mimetype="application/json",status=400)
-    try:
-        HTTPres['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
-    except Exception as e:
-        HTTPres['Access-Control-Allow-Origin'] = "*"
+    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', "*")
     return HTTPres
         
 def login(request):
@@ -308,6 +309,9 @@ def login(request):
         if cookie is not None and 'kbase_sessionid' in sessiondoc:
             cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
+    except AuthFailure, a:
+        response['error_msg'] = "%s" % a
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 401)
     except Exception, e:
         if type(e).__name__ != "Exception" :
             response['error_msg'] = "%s e: %s" % (type(e).__name__,e)
@@ -315,7 +319,7 @@ def login(request):
             response['error_msg'] = "Exception: %s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 200)
     # Enable some basic CORS support
-    HTTPres['Access-Control-Allow-Credentials'] = 'true'
-    HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
+    #HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    #HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
     return HTTPres
 
