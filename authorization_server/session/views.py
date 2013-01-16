@@ -307,6 +307,6 @@ def login(request):
             response['error_msg'] = "%s e: %s" % (type(e).__name__,e)
         else:
             response['error_msg'] = "Exception: %s" % e
-        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 200)
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)
     return HTTPres
 
