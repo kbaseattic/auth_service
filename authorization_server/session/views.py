@@ -304,9 +304,6 @@ def login(request):
             # Convert the datetime objects to string representations
             response['creation'] = "%s" % sessiondoc['creation']
             response['expiration'] = "%s" % sessiondoc['expiration']
-        # Enable some basic CORS support
-        HTTPres['Access-Control-Allow-Credentials'] = 'true'
-        HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
         # If we were asked for a cookie, set a kbase_sessionid cookie in the response object
         if cookie is not None and 'kbase_sessionid' in sessiondoc:
             cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
@@ -317,5 +314,8 @@ def login(request):
         else:
             response['error_msg'] = "Exception: %s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 200)
+    # Enable some basic CORS support
+    HTTPres['Access-Control-Allow-Credentials'] = 'true'
+    HTTPres['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
     return HTTPres
 
