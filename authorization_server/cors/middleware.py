@@ -15,4 +15,5 @@ class AllowOriginMiddleware(object):
             response['Access-Control-Allow-Origin'] = origin
             response['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS, DELETE, PUT'
             response['Access-Control-Allow-Headers'] = allow_headers
+            response['Access-Control-Allow-Credentials'] = 'true'
         return response
