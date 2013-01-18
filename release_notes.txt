@@ -1,3 +1,20 @@
+VERSION: 0.3.0 (Released 1/21/2013)
+------------------------------------------
+NEW FEATURES:
+- Support for generating a new session based on an existing token
+
+UPDATED FEATURES / MAJOR BUG FIXES:
+- Redid cors support, moved support into django middleware package
+- fixed bug related to support for token support
+
+ANTICIPATED FUTURE DEVELOPMENTS:
+- Support for KB_DEPLOYMENT_CONFIG
+
+
+
+
+VERSION: 0.2.0 (Released 11/28/2013)
+------------------------------------------
 
    This release of the authorization_service includes the following features:
    1) Support for acquiring login sessions through a javascript UI widget. This is still in flux and under active development. Documentation will be forthcoming. The endpoint is at .../Sessions/*
