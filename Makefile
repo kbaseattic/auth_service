@@ -13,6 +13,10 @@ SERVICE = authorization_server
 SERVICE_DIR = $(TARGET)/services/$(SERVICE)
 NGINX_CONF = /etc/nginx/conf.d/
 
+# The Google Doc is at the URL https://docs.google.com/a/lbl.gov/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit#
+# So you can derive the download URL by replacing the /edit portion with /export and then a format specifier
+DOCURL := https://docs.google.com/a/lbl.gov/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/export?format=html
+
 all:
 
 deploy: deploy-services
@@ -37,9 +41,13 @@ deploy-test-services: deploy-nginx
 
 deploy-docs:
 	# create docs here in docs directory and deploy them if needed
-	#mkdir -p $(SERVICE_DIR)
-	#mkdir -p $(SERVICE_DIR)/webroot
-	#cp docs/*html $(SERVICE_DIR)/webroot/.
+	mkdir -p $(SERVICE_DIR)
+	mkdir -p $(SERVICE_DIR)/webroot
+	cp docs/*html $(SERVICE_DIR)/webroot/.
+
+build-docs:
+	curl -o docs/auth_service.html $(DOCURL)
+
 
 build-docs:
 	# The Google Doc is at the URL https://docs.google.com/a/lbl.gov/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit#
