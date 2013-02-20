@@ -106,14 +106,14 @@ class RoleHandler( BaseHandler):
     roles.ensure_index( 'members' )
     # Set the role_id to require for updates to the roles db
     try:
-        kbase_users = settings.kbase_users
+        kbase_users = settings.KBASE_USERS
     except AttributeError as e:
         kbase_users = 'kbase_users'
 
     # Set the role_id specifying which user_ids can create
     # roles that contain ownership information
     try:
-        kbase_owners = settings.kbase_owners
+        kbase_owners = settings.KBASE_OWNERS
     except AttributeError as e:
         kbase_owners = 'kbase_users'
     
@@ -169,12 +169,19 @@ class RoleHandler( BaseHandler):
 
     # Check mongodb to see if the user is in kbase_user role, necessary
     # before they can perform any kinds of updates
-    # Note that possessing a Globus Online ID is not sufficient
+    # Note that possessing a Globus Online ID is not sufficient unless
+    # the "bypass_kbase_users" setting is defined.
     def check_kbase_user(self, user_id):
         try:
+            if not ( hasattr(settings, 'REQUIRE_KBASE_USERS') and
+                       settings.REQUIRE_KBASE_USERS ):
+                return True
             res = self.roles.find_one( { 'role_id' : self.kbase_users,
                                          'members' : user_id })
-            return res is not None
+            if res is not None:
+                return True
+            else:
+                return False
         except:
             return False
 

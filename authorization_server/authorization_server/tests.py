@@ -136,11 +136,14 @@ class RoleHandlerTest(TestCase):
 
         self.assertEqual(resp.status_code, 401, "Should reject create without auth token")
 
-        resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % papatoken, content_type="application/json" )
-        self.assertEqual(resp.status_code, 401, "Should reject create without KBase membership")
+        if hasattr(settings, 'REQUIRE_KBASE_USERS') and settings.REQUIRE_KBASE_USERS:
+            resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % papatoken, content_type="application/json" )
+            self.assertEqual(resp.status_code, 401, "Should reject create without KBase membership")
 
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
-    
+
+        #print pprint.pformat( resp.status_code)
+        #print pprint.pformat( resp.content)
         self.assertEqual(resp.status_code, 201, "Should accept creation from legit kbase test user")
         # verify that object was inserted into database properly
         dbobj = self.roles.find( { 'role_id' : testdata['role_id'] } );
@@ -221,8 +224,9 @@ class RoleHandlerTest(TestCase):
         resp = h.get(url)
         self.assertEqual(resp.status_code, 401, "Should reject queries without auth token")
 
-        resp = h.get(url, {}, HTTP_AUTHORIZATION="OAuth %s" % papatoken)
-        self.assertEqual(resp.status_code, 401, "Should reject queries without KBase membership")
+        if hasattr( settings, 'REQUIRE_KBASE_USERS') and settings.REQUIRE_KBASE_USERS:
+            resp = h.get(url, {}, HTTP_AUTHORIZATION="OAuth %s" % papatoken)
+            self.assertEqual(resp.status_code, 401, "Should reject queries without KBase membership")
 
         resp = h.get(url+"?about", {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
         self.assertEqual(resp.status_code, 200, "Should accept queries from legit kbase test user")
