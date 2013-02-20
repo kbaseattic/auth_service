@@ -41,6 +41,13 @@ deploy-docs:
 	#mkdir -p $(SERVICE_DIR)/webroot
 	#cp docs/*html $(SERVICE_DIR)/webroot/.
 
+build-docs:
+	# The Google Doc is at the URL https://docs.google.com/a/lbl.gov/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit#
+	# So you can derive the download URL by replacing the /edit portion with /export and then a format specifier
+	URL=https://docs.google.com/a/lbl.gov/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/export?format=html
+	curl -o docs/auth_service.html $(URL)
+
+
 .PHONY: test
 
 test: test_django
