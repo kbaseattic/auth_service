@@ -19,28 +19,39 @@ class GlobusGroupsSync:
     sychan@lbl.gov
 
     """
-    GlobusBaseURL =  "nexus.api.globusonline.org"
-    GlobusUser = "sychan"
-    GlobusPassword = "w1ndyEZ"
+    try:
+        GlobusBaseURL =  settings.GLOBUSBASEURL
+    except:
+        GlobusBaseURL =  "nexus.api.globusonline.org"
+    try:
+        GlobusUser = settings.GLOBUSUSER
+    except:
+        GlobusUser = 'kbasetest'
+    try:
+        GlobusPassword = settings.GLOBUSPASSWORD
+    except:
+        GlobusPassword = "@Suite525"
     # This group ID should be the root group for kbase, "kbase_users". All KBase groups
     # should be children of this group
-    RootGID = '99d2a548-7218-11e2-adc0-12313d2d6e7f'
+    try:
+        RootGID = settings.ROOTGID
+    except:
+        RootGID = '99d2a548-7218-11e2-adc0-12313d2d6e7f'
     # This is the number of seconds that the group dict instance var can linger before
     # it needs to be updated
-    GroupCacheTTL = 60
     try:
-        MongoConn = settings.MongoDB_CONN
+        GroupCacheTTL = settings.GROUPCACHETTL
     except:
-        MongoConn = "localhost:27018"
+        GroupCacheTTL = 60
 
     # We need to define the appropriate settings and set them here
     try:
-        conn = Connection(MongoConn)
+        conn = Connection(settings.MONGODB_CONN)
     except AttributeError as e:
-        print "No connection settings specified: %s\n" % e
+        print "No connection settings specified: %s\nConnection to mongodb.kbase.us by default." % e
         conn = Connection(['mongodb.kbase.us'])
     except Exception as e:
-        print "Generic exception %s: %s\n" % (type(e),e)
+        print "Generic exception %s: %s\nConnection to mongodb.kbase.us by default" % (type(e),e)
         conn = Connection(['mongodb.kbase.us'])
     db = conn.authorization
     roles = db.roles

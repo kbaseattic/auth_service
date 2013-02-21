@@ -83,6 +83,7 @@ from piston.resource import Resource
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from GlobusGroupsSync import GlobusGroupsSync
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -132,7 +133,8 @@ class RoleHandler( BaseHandler):
                                   'impersonate' : 'List of kbase user_ids (strings) that this role allows impersonate privs',
                                   'grant' : 'List of kbase authz role_ids (strings) that this role allows grant privs',
                                   'create' : 'Boolean value - does this role provide the create privilege',
-                                  'owns' : 'List of document_ids that are owned by the role_owner and role_updaters'
+                                  'owns' : 'List of document_ids that are owned by the role_owner and role_updaters',
+                                  'globus_group' : 'Optional group path in Globus Online that is used to synchronize members field'
                                   },
                   'contact' : { 'email' : 'sychan@lbl.gov'},
                   'usage'   : 'This is a standard REST service. Note that read handler takes ' + 
@@ -166,6 +168,10 @@ class RoleHandler( BaseHandler):
     # Schema used for updates
     update_schema = copy.deepcopy(input_schema)
     update_schema['properties']['description'] = { 'type' : 'string'}
+
+    # instance of the class used to synchronize mongodb role members against
+    # Globus Online
+    gclient = GlobusGroupsSync()
 
     # Check mongodb to see if the user is in kbase_user role, necessary
     # before they can perform any kinds of updates
@@ -387,6 +393,10 @@ class RoleHandler( BaseHandler):
             # "member" attribute to the existing one, ignore all other entries
             addmembers = 'addmembers' in request.GET
             delmembers = 'delmembers' in request.GET
+            # If syncglobus is among the URL variables, then ignore everything else and
+            # and synchronize the members field against the globus online group specified
+            # in the role's globus_group field, all the normal restrictions apply for who can do it
+            syncglobus = 'syncglobus' in request.GET
             if addmembers and delmembers:
                 raise Exception('Cannot use addmembers and delmembers in single request')
             old = self.roles.find_one( { 'role_id': role_id })
@@ -404,6 +414,11 @@ class RoleHandler( BaseHandler):
                             old['members'] = list( set( old['members']) | set(r['members']))
                         elif delmembers:
                             old['members'] = list( set(old['members']) - set(r['members']))
+                        elif syncglobus:
+                            if 'globus_group' not in old:
+                                raise Exception( "Cannot use syncglobus operation when globus_group is not defined")
+                            members = self.gclient.getGroupMembersByPath( old['globus_group'] ).keys()
+                            old['members'] = list( set( old['members']) | set(members))
                         else:
                             validate(r,self.update_schema)
                             # Verify that the current user actually has privs to set ownership
