@@ -50,7 +50,9 @@ class NexusClient(object):
         self.client = self.config['client']
         if 'SSH_AUTH_SOCK' in os.environ:
             self.agent = nexus.sshagent.Agent2()
-            self.agent_keys = self.agent.keys
+            sshkeys = self.agent.keys
+            # strip out DSA keys since they are unusable for GO
+            self.agent_keys = { name : sshkeys[name] for name in sshkeys.keys() if sshkeys[name].get_name() == 'ssh-rsa' }
         self.client_secret = self.config['client_secret']
         self.user_key_file = self.config.get('user_private_key_file', '~/.ssh/id_rsa')
         cache_class = cache_config['class']

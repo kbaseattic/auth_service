@@ -1,12 +1,13 @@
-VERSION: 0.4.0 (Released 2/20/2013)
+VERSION: 0.4.0 (Released 2/26/2013)
 ------------------------------------------
 NEW FEATURES:
 - Support for synchronizing role members against Globus Online groups service
+- Globus Nexus libraries extended to support ssh-agent authentication using paramiko
 
 UPDATED FEATURES / MAJOR BUG FIXES:
 - Changed requirement for membership in KBASE_USERS into a django setting. Default is not to require
 - Fixed bugs in django settings - some settings were in lowercase
-
+- Updated to latest versions of Globus Nexus python libraries
 
 VERSION: 0.3.0 (Released 1/21/2013)
 ------------------------------------------
