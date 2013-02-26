@@ -12,6 +12,8 @@ import sys
 from pyasn1.type import univ
 from pyasn1.codec.der import encoder as der_encoder
 import rsa
+import paramiko.agent
+from paramiko.message import Message
 
 def b64encode(value):
     """
@@ -125,6 +127,45 @@ def sign_with_rsa(key_file, path, method, user_id, body='', query='', password=N
             headers['X-Globus-Timestamp'],
             headers['X-Globus-UserId'])
     value = rsa.sign(to_sign, private_key, 'SHA-1')
+    sig = b64encode(value)
+    for i, line in enumerate(sig):
+        headers['X-Globus-Authorization-{0}'.format(i)] = line
+    return headers
+
+def sign_with_sshagent(agentkey, path, method, user_id, body='', query=''):
+    """
+    Sign a request using the specified paramiko.AgentKey.
+
+    :return: dictionary of headers
+    """
+    headers = {
+            'X-Globus-UserId': user_id,
+            'X-Globus-Sign': 'version=1.0'
+            }
+    timestamp = canonical_time(datetime.datetime.now())
+    headers['X-Globus-Timestamp'] = timestamp
+    hashed_body = base64.b64encode(hashlib.sha1(body).digest())
+    hashed_path =  base64.b64encode(hashlib.sha1(path).digest())
+    hashed_query = base64.b64encode(hashlib.sha1(query).digest())
+    to_sign = ("Method:{0}\n"
+        "Hashed Path:{1}\n"
+        "X-Globus-Content-Hash:{2}\n"
+        "X-Globus-Query-Hash:{3}\n"
+        "X-Globus-Timestamp:{4}\n"
+        "X-Globus-UserId:{5}")
+    to_sign = to_sign.format(method,
+            hashed_path,
+            hashed_body,
+            hashed_query,
+            headers['X-Globus-Timestamp'],
+            headers['X-Globus-UserId'])
+    rawsig = agentkey.sign_ssh_data(None,to_sign)
+    msg = Message( content=rawsig)
+    type = msg.get_string()
+    if not type == "ssh-rsa":
+        raise Exception( "Returned signature is not RSA signature")
+    value = msg.get_string()
+    # value = rawsig[15:]
     sig = b64encode(value)
     for i, line in enumerate(sig):
         headers['X-Globus-Authorization-{0}'.format(i)] = line

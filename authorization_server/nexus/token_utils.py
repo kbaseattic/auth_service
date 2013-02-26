@@ -14,6 +14,7 @@ import re
 import sys
 import time
 import urllib
+import urlparse
 
 import requests
 import rsa
@@ -107,25 +108,32 @@ class LoggingCacheWrapper(object):
 
 def validate_token(token, cache=InMemoryCache(), verify=True):
     """
-    Given a token validate it.
+    Given a request or access token validate it.
 
     Keyword arguments:
     :param tokens: A signed authentication token which was provided by Nexus
 
-    :raises ValueError: If the signature is invalid
+    :raises ValueError: If the signature is invalid, the token is expired or
+    the public key could not be gotten.
     """
     unencoded_token = urllib.unquote(token)
     token_map = {}
     for entry in unencoded_token.split('|'):
         key, value = entry.split('=')
         token_map[key] = value
-    subject_hash = hashlib.md5(token_map['SigningSubject']).hexdigest()
-    if not cache.has_public_key(subject_hash):
-        key_struct = requests.get(token_map['SigningSubject'], verify=verify).content
-        public_key = json.loads(key_struct)['pubkey']
-        cache.save_public_key(subject_hash, public_key)
 
-    public_key = cache.get_public_key(subject_hash)
+    # If the public key is not already in the cache, cache it keyed by the signing subject.
+    if not cache.has_public_key(token_map['SigningSubject']):
+        response = requests.get(token_map['SigningSubject'], verify=verify)
+        if response.status_code != 200:
+            message = "Could not get SigningSubject public key"
+            log.debug(message)
+            raise ValueError(message)
+        key_struct = response.content
+        public_key = json.loads(key_struct)['pubkey']
+        cache.save_public_key(token_map['SigningSubject'], public_key)
+
+    public_key = cache.get_public_key(token_map['SigningSubject'])
     sig = token_map.pop('sig')
     match = re.match('^(.+)\|sig=.*', unencoded_token)
     signed_data = match.group(1)
@@ -141,11 +149,16 @@ def validate_token(token, cache=InMemoryCache(), verify=True):
     now = time.mktime(datetime.utcnow().timetuple())
     if token_map['expiry'] < now:
         raise ValueError('TokenExpired')
-    return token_map['un']
+    urlparts = urlparse.urlparse(token_map['SigningSubject'])
+    return (
+        token_map['un'],
+        token_map['client_id'],
+        urlparts.hostname
+    )
 
 def request_access_token(client_id, client_secret,
         auth_code, auth_uri="https://graph.api.globusonline.org/token",
-        verify=True):
+        verify=False):
     """
     Given an authorization code, request an access token.
 
@@ -156,7 +169,7 @@ def request_access_token(client_id, client_secret,
 
     :returns: A dictionary of the access code response.  This will include the
     fields: access_token, refresh_token and expires_in
-    :raises AccessTokenRequestError: If the request for an access token fails
+    :raises TokenRequestError: If the request for an access token fails
     """
     payload = {
             'grant_type': 'authorization_code',
@@ -165,7 +178,7 @@ def request_access_token(client_id, client_secret,
     response = requests.post(auth_uri,
             auth=(client_id, client_secret),
             data=payload, verify=verify)
-    if response.status_code == requests.codes.ok:
+    if response.status_code == requests.codes.created:
         return DictObj(response.json)
     raise TokenRequestError(response.json)
 
