@@ -170,7 +170,7 @@ def login_js(request):
     base_url = get_baseurl(request)
     login_js = django.template.loader.render_to_string('login-dialog.js',{'base_url' : base_url,
                                                                            'all_fields' : all_fields})
-    return HTTPres
+    return HttpResponse( login_js, content_type='text/javascript')
 
 def login_form(request):
     login_form = django.template.loader.render_to_string('login-form.html',{})

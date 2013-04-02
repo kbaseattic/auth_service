@@ -148,7 +148,7 @@ class OAuth2Middleware(AuthenticationMiddleware):
             if (request.user.is_authenticated() and self.shortcut):
                 return
 
-            user_id = OAuth2Middleware.client.authenticate_user( token)
+            (user_id,client_id,server) = OAuth2Middleware.client.validate_token( token)
             if not user_id:
                 logging.error("Authentication token failed validation")
                 return None
