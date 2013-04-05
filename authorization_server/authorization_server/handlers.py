@@ -90,7 +90,8 @@ pp = pprint.PrettyPrinter(indent=4)
 class RoleHandler( BaseHandler):
     allowed_methods = ('GET','POST','PUT','DELETE')
     fields = ['role_id','description','members','read','modify','delete',
-              'impersonate','grant','create','role_owner','role_updater']
+              'impersonate','grant','create','role_owner','role_updater',
+              'globus_group']
     exclude = []
     # We need to define the appropriate settings and set them here
     try:
@@ -161,7 +162,8 @@ class RoleHandler( BaseHandler):
                                       'modify' : { 'type' : 'array' },
                                       'delete' : { 'type' : 'array' },
                                       'impersonate' : { 'type' : 'array' },
-                                      'owns' : { 'type' : 'array' }
+                                      'owns' : { 'type' : 'array' },
+                                      'globus_group' : { 'type' : 'string' }
                                       }
                      }
 
@@ -347,7 +349,8 @@ class RoleHandler( BaseHandler):
             elif self.roles.find( { 'role_id': r['role_id'] }).count() == 0:
                 # Schema validation
                 new = { x : r.get(x,[]) for x in ('read','modify','delete','impersonate',
-                                                  'grant','create','members','role_updater','owns') }
+                                                  'grant','create','members','role_updater','owns',
+                                                  'globus_group') }
                 new['role_id'] = r['role_id']
                 new['description'] = r['description']
                 new['role_owner'] = request.user.username

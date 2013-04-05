@@ -56,10 +56,13 @@ class GlobusGroupsSync:
     db = conn.authorization
     roles = db.roles
 
-    def __init__(self):
+    def __init__(self, token = None):
         try:
-            self.GlobusClient = GlobusOnlineRestClient( go_host = self.GlobusBaseURL,
-                                                        username = self.GlobusUser, password = self.GlobusPassword)
+            if not token is None:
+                self.GlobusClient = GlobusOnlineRestClient( go_host = self.GlobusBaseURL, token = token )
+            else: 
+                self.GlobusClient = GlobusOnlineRestClient( go_host = self.GlobusBaseURL,
+                                                            username = self.GlobusUser, password = self.GlobusPassword)
             resHeader,self.RootGroup = self.GlobusClient._issue_rest_request('/groups/%s/tree' % self.RootGID)
             if resHeader.status != 200:
                 raise Exception( "Failed to fetch KBase root group %s from Globus Online response code %s" %
