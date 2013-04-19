@@ -83,7 +83,8 @@ class RoleHandlerTest(TestCase):
                           "impersonate": [],
                           "members": ["sychan","kbasetest","kbauthorz"],
                           "delete": [],
-                          "owns": []
+                          "owns": [],
+                          "globus_group": ""
                           }
         self.test_docid = "doc_" + "".join(random.sample(charset,10))
         # clear out any cruft from previous unittest runs
@@ -351,6 +352,7 @@ class RoleHandlerTest(TestCase):
 
         # try without auth, should fail
         resp = h.put( url_roleid, jdata, content_type="application/json")
+        #print "resp.content = %s" % pp.pformat( resp.content)
         self.assertEqual(resp.status_code, 401, "Should reject update without auth token")
 
         # try with non kbase auth, should fail
@@ -390,6 +392,8 @@ class RoleHandlerTest(TestCase):
         jdata = json.dumps( testdata2)
         resp = h.put( url_roleid, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        #print pprint.pformat( resp.status_code)
+        #print pprint.pformat( resp.content)
         self.assertEqual(resp.status_code, 201, "Should allow update")
 
 
@@ -435,14 +439,14 @@ class RoleHandlerTest(TestCase):
                               'members' : [ 'captainkirk', 'tweetybird']})
         resp = h.put( url2, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
-        print resp.content
+        #print resp.content
         self.assertEqual(resp.status_code, 201, "Should accept addmembers")
 
         # test out the addmember and delmember functions
         url2 = "%s?delmembers=" % url
         resp = h.put( url2, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
-        print resp.content
+        #print resp.content
         self.assertEqual(resp.status_code, 201, "Should accept delmembers")
 
         # test out the addmember and delmember functions
