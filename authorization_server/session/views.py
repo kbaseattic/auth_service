@@ -31,7 +31,7 @@ except:
 try:
     salt = settings.KBASE_SESSION_SALT
 except:
-    logging.error("KBASE_SESSION_SALT not set in settings file, using hard coded default")
+    logging.info("KBASE_SESSION_SALT not set in settings file, using hard coded default")
     salt = "(African || European)?"
 
 # If we have a front end proxy, hopefully the URL used to access the
@@ -56,10 +56,10 @@ cookie_re = re.compile(r"un=(\w+)\|kbase_sessionid=(\w+)")
 try:
     conn = Connection(settings.MONGODB_CONN)
 except AttributeError as e:
-    print "No connection settings specified: %s\n" % e
+    logging.info("No connection settings specified: %s. Using default mongodb." % e)
     conn = Connection(['mongodb.kbase.us'])
 except Exception as e:
-    print "Generic exception %s: %s\n" % (type(e),e)
+    logging.warning("Generic exception %s: %s. Connecting to default mongodb." % (type(e),e)
     conn = Connection(['mongodb.kbase.us'])
 db = conn.authorization
 sessiondb = db.sessions

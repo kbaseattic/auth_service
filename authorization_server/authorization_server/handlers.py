@@ -77,6 +77,7 @@ import pprint
 import datetime
 import json
 import copy
+import logging
 from jsonschema import validate
 from pymongo import Connection
 from piston.resource import Resource
@@ -97,10 +98,10 @@ class RoleHandler( BaseHandler):
     try:
         conn = Connection(settings.MONGODB_CONN)
     except AttributeError as e:
-        print "No connection settings specified: %s\n" % e
+        logging.info("No connection settings specified: %s. Connecting to default mongodb service" % e)
         conn = Connection(['mongodb.kbase.us'])
     except Exception as e:
-        print "Generic exception %s: %s\n" % (type(e),e)
+        logging.warning("Generic exception %s: %s. Connecting to default mongodb service" % (type(e),e))
         conn = Connection(['mongodb.kbase.us'])
     db = conn.authorization
     roles = db.roles

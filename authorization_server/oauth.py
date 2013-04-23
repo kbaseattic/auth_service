@@ -104,7 +104,7 @@ class OAuth2Middleware(AuthenticationMiddleware):
     try:
         salt = settings.KBASE_SESSION_SALT
     except:
-        logging.error("KBASE_SESSION_SALT has not been set in settings file. Using hard coded default.")
+        logging.info("KBASE_SESSION_SALT has not been set in settings file. Using hard coded default.")
         salt = "(African || European)?"
 
     def __init__(self, realm='API'):
