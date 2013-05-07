@@ -59,7 +59,7 @@ except AttributeError as e:
     logging.info("No connection settings specified: %s. Using default mongodb." % e)
     conn = Connection(['mongodb.kbase.us'])
 except Exception as e:
-    logging.warning("Generic exception %s: %s. Connecting to default mongodb." % (type(e),e)
+    logging.warning("Generic exception %s: %s. Connecting to default mongodb." % (type(e),e))
     conn = Connection(['mongodb.kbase.us'])
 db = conn.authorization
 sessiondb = db.sessions
