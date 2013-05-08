@@ -89,6 +89,7 @@ from GlobusGroupsSync import GlobusGroupsSync
 pp = pprint.PrettyPrinter(indent=4)
 
 class RoleHandler( BaseHandler):
+    version = '0.3.0'
     allowed_methods = ('GET','POST','PUT','DELETE')
     fields = ['role_id','description','members','read','modify','delete',
               'impersonate','grant','create','role_owner','role_updater',
@@ -122,6 +123,7 @@ class RoleHandler( BaseHandler):
     
     # Help object when queries go to the top level with no search specification
     help_json = { 'id' : 'KBase Authorization',
+                  'version' : version,
                   'documentation' : 'https://docs.google.com/document/d/1CTkthDUPwNzMF22maLyNIktI1sHdWPwtd3lJk0aFb20/edit',
                   'documentation2' : 'https://docs.google.com/document/d/1-43UvESzSYtLInqOouBE1s97a6-cRuPghbNJopYeU5Y/edit',
                   'resources' : { 'role_id' : 'Unique human readable identifer for role (required)',
