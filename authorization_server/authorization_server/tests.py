@@ -75,7 +75,7 @@ class RoleHandlerTest(TestCase):
         self.testdata = { "role_updater": ["sychan","kbauthorz"],
                           "description": "Steve's test role",
                           "read": [],
-                          "create": [],
+                          "create": True,
                           "modify": [],
                           "grant" : [],
                           "role_owner": "kbasetest",
@@ -143,6 +143,7 @@ class RoleHandlerTest(TestCase):
 
         resp = h.post(url, data, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken, content_type="application/json" )
 
+        #print pprint.pformat( data)
         #print pprint.pformat( resp.status_code)
         #print pprint.pformat( resp.content)
         self.assertEqual(resp.status_code, 201, "Should accept creation from legit kbase test user")
@@ -329,7 +330,7 @@ class RoleHandlerTest(TestCase):
         role_idsdb = set([x['role_id'] for x in dbroles])
         self.assertTrue( role_ids == role_idsdb, "Should get identical role_ids from pymongo and user_id=kbasetest&union=query")
         merged=dict()
-        for acls in ('grant','read','create','modify','delete','owns','members'):
+        for acls in ('grant','read','modify','delete','owns','members'):
             merged[acls] = reduce( set.union, [ set(x.get(acls,[])) for x in dbroles])
             self.assertTrue( merged[acls] == set(respjson[0][acls]), "Should get identical %s ACL from pymongo and user_id=kbasetest&union= query" % acls)
 
@@ -375,20 +376,25 @@ class RoleHandlerTest(TestCase):
         testdata['role_updater'].append("kbasetest");
         testdata['_id'] = id
         self.roles.save( testdata)
+        #print pprint.pformat( testdata)
         testdata2 = dict(testdata)
         del testdata2['_id']
         testdata2['description'] = "New test role description"
-        testdata2['create'] = ['bugsbunny','roadrunner']
+        testdata2['read'] = ['bugsbunny','roadrunner']
         jdata = json.dumps( testdata2)
 
         # try again, should deny update because of ownership
         resp = h.put( url_roleid, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )
+        #print pprint.pformat( url_roleid)
+        #print pprint.pformat( jdata)
+        #print pprint.pformat( resp.status_code)
+        #print pprint.pformat( resp.content)
         self.assertEqual(resp.status_code, 400, "Should deny update")
 
         # try again, set ownership which should allow update
         testdata_no_own = dict( testdata2)
-        testdata2['owns'] = testdata2['create']
+        testdata2['owns'] = ['bugsbunny','roadrunner']
         jdata = json.dumps( testdata2)
         resp = h.put( url_roleid, jdata, content_type="application/json",
                      HTTP_AUTHORIZATION = "OAuth %s" % kbusertoken )

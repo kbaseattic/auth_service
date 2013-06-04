@@ -14,7 +14,7 @@ from datetime import datetime,timedelta
 from django.http import HttpResponse
 from django.conf import settings
 from nexus import Client
-from pymongo import Connection
+from pymongo import Connection,ReadPreference
 from authorization_server.handlers import RoleHandler
 import xml.etree.ElementTree as ET
 
@@ -62,6 +62,7 @@ except Exception as e:
     logging.warning("Generic exception %s: %s. Connecting to default mongodb." % (type(e),e))
     conn = Connection(['mongodb.kbase.us'])
 db = conn.authorization
+db.read_preference = ReadPreference.PRIMARY_PREFERRED
 sessiondb = db.sessions
 sessiondb.ensure_index('kbase_sessionid')
 
