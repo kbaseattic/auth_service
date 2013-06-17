@@ -162,7 +162,7 @@ class RoleHandler( BaseHandler):
                                       'role_updater' : { 'type' : 'array' },
                                       'members' : { 'type' : 'array' },
                                       'read' : { 'type' : 'array' },
-                                      'create' : { 'type' : 'array' },
+                                      'create' : { 'type' : 'boolean' },
                                       'modify' : { 'type' : 'array' },
                                       'delete' : { 'type' : 'array' },
                                       'impersonate' : { 'type' : 'array' },
@@ -307,7 +307,7 @@ class RoleHandler( BaseHandler):
                 if merge:
                     role_ids = ",".join(( match[x]['role_id'] for x in range(len(match))))
                     merged = { 'role_id' : role_ids }
-                    for acls in ('grant','read','create','modify','delete','owns','members'):
+                    for acls in ('grant','read','modify','delete','owns','members'):
                         merged[acls] = list(reduce( set.union, [ set(match[x].get(acls,[])) for x in range(len(match))]))
                     match = [merged]
                 if len(mongo_filter.keys()) > 0:
@@ -325,8 +325,7 @@ class RoleHandler( BaseHandler):
 
     # Verify that the role_owner actually has ownership on the documents being ACL'ed
     def ownership_legit( self, doc, user_id):
-        doc_ids = set(doc.get('read',[]) + doc.get('create',[]) +
-                      doc.get('modify',[]) + doc.get('delete',[]))
+        doc_ids = set(doc.get('read',[]) + doc.get('modify',[]) + doc.get('delete',[]))
         # is this an initial ownership assertion?
         own_ids = doc.get('owns', [])
         if own_ids != [] and not self.no_owners(own_ids):
@@ -353,7 +352,8 @@ class RoleHandler( BaseHandler):
             elif self.roles.find( { 'role_id': r['role_id'] }).count() == 0:
                 # Schema validation
                 new = { x : r.get(x,[]) for x in ('read','modify','delete','impersonate',
-                                                  'grant','create','members','role_updater','owns') }
+                                                  'grant','members','role_updater','owns') }
+                new['create'] = r['create']
                 new['role_id'] = r['role_id']
                 new['description'] = r['description']
                 new['role_owner'] = request.user.username
