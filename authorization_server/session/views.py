@@ -10,6 +10,7 @@ import pprint
 import rsa
 import django.template
 import re
+import common
 from datetime import datetime,timedelta
 from django.http import HttpResponse
 from django.conf import settings
@@ -18,7 +19,10 @@ from pymongo import Connection
 from authorization_server.handlers import RoleHandler
 import xml.etree.ElementTree as ET
 
-# Authentication server
+# Version of this service
+version = "0.9.0"
+
+# Authentication server config
 
 # Create a Python Globus client
 client = Client(config_file=os.path.join(os.path.dirname(__file__), '../nexus/nexus.yml'))
