@@ -64,7 +64,8 @@ except Exception as e:
 db = conn.authorization
 db.read_preference = ReadPreference.PRIMARY_PREFERRED
 sessiondb = db.sessions
-sessiondb.ensure_index('kbase_sessionid')
+if conn.is_primary():
+    sessiondb.ensure_index('kbase_sessionid')
 
 # Default session lifetime in seconds from settings file
 # otherwise default to 1 hour

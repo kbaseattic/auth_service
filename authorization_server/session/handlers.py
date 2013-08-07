@@ -36,6 +36,7 @@ class SessionHandler( BaseHandler):
     exclude = ( '_id', )
     # We need to define the appropriate settings and set them here
     try:
+        print "Connecting to %s" % settings.MONGODB_CONN
         conn = Connection(settings.MONGODB_CONN)
     except AttributeError as e:
         print "No connection settings specified: %s\n" % e

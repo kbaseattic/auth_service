@@ -97,6 +97,7 @@ class RoleHandler( BaseHandler):
     exclude = []
     # We need to define the appropriate settings and set them here
     try:
+        print "Connecting to %s" % settings.MONGODB_CONN
         conn = Connection(settings.MONGODB_CONN)
     except AttributeError as e:
         logging.info("No connection settings specified: %s. Connecting to default mongodb service" % e)
@@ -106,8 +107,9 @@ class RoleHandler( BaseHandler):
         conn = Connection(['mongodb.kbase.us'])
     db = conn.authorization
     roles = db.roles
-    roles.ensure_index( 'role_id', unique=True )
-    roles.ensure_index( 'members' )
+    if conn.is_primary:
+        roles.ensure_index( 'role_id', unique=True )
+        roles.ensure_index( 'members' )
     # Set the role_id to require for updates to the roles db
     try:
         kbase_users = settings.KBASE_USERS
