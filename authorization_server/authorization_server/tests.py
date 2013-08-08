@@ -7,6 +7,7 @@ Replace this with more appropriate tests for your application.
 
 from django.test import TestCase
 from django.conf import settings
+from django.utils import unittest
 from nexus import Client
 from pymongo import Connection
 from authorization_server.handlers import RoleHandler
@@ -53,12 +54,13 @@ pp = pprint.PrettyPrinter(indent=4)
 # Pull in RoleHandler so we can call the dedupe function
 rh = RoleHandler()
 
+# flag for whether the mongodb instance is a slave instance
+is_slave = None
+
 class RoleHandlerTest(TestCase):
     """
     Unit Test of REST interface to make sure correct status codes are returned
     """
-
-    is_master = None
 
     def setUp(self):
         # TODO: Pull out all the common POST code into setup
@@ -72,7 +74,7 @@ class RoleHandlerTest(TestCase):
             conn = Connection(['mongodb.kbase.us'])
 
         db=conn.authorization
-        self.is_slave = conn.is_primary
+        is_slave = not conn.is_primary
         self.roles = db.roles
         self.testdata = { "role_updater": ["sychan","kbauthorz"],
                           "description": "Steve's test role",
@@ -106,7 +108,7 @@ class RoleHandlerTest(TestCase):
         # clear out any cruft from current unittest run
         self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
 
-
+    @unittest.skipIf(is_slave, "MongoDB db is a slave instance, cannot test creation")
     def testCreate(self):
         h = self.client
         url = "/Roles/"
@@ -336,6 +338,7 @@ class RoleHandlerTest(TestCase):
             merged[acls] = reduce( set.union, [ set(x.get(acls,[])) for x in dbroles])
             self.assertTrue( merged[acls] == set(respjson[0][acls]), "Should get identical %s ACL from pymongo and user_id=kbasetest&union= query" % acls)
 
+    @unittest.skipIf(is_slave, "MongoDB db is a slave instance, cannot test updates")
     def testUpdate(self):
         h = self.client
         url = "/Roles/"
@@ -355,8 +358,8 @@ class RoleHandlerTest(TestCase):
 
         # try without auth, should fail
         resp = h.put( url_roleid, jdata, content_type="application/json")
-        print "resp.status_code = %s" % pp.pformat( resp.status_code)
-        print "resp.content = %s" % pp.pformat( resp.content)
+        #print "resp.status_code = %s" % pp.pformat( resp.status_code)
+        #print "resp.content = %s" % pp.pformat( resp.content)
         self.assertEqual(resp.status_code, 401, "Should reject update without auth token")
 
         # try with non kbase auth, should fail
@@ -467,6 +470,7 @@ class RoleHandlerTest(TestCase):
 
         self.roles.remove( { '_id' : id }, safe=True)
         
+    @unittest.skipIf(is_slave, "MongoDB db is a slave instance, cannot test deletion")
     def testDelete(self):
         h = self.client
         url = "/Roles/"
