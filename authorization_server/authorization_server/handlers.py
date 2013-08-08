@@ -110,6 +110,9 @@ class RoleHandler( BaseHandler):
     if conn.is_primary:
         roles.ensure_index( 'role_id', unique=True )
         roles.ensure_index( 'members' )
+    else:
+        # we are a slave, disallow POST, PUT, DELETE and only support GET
+        allowed_methods = ('GET')
     # Set the role_id to require for updates to the roles db
     try:
         kbase_users = settings.KBASE_USERS

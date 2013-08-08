@@ -44,6 +44,9 @@ class SessionHandler( BaseHandler):
     except Exception as e:
         print "Generic exception %s: %s\n" % (type(e),e)
         conn = Connection()
+    if not conn.is_primary:
+        # we are a slave, disallow POST, PUT, DELETE and only support GET
+        allowed_methods = ('GET')
     db = conn.authorization
     roles = db.sessions
 

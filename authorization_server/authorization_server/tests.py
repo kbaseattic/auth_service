@@ -56,8 +56,9 @@ rh = RoleHandler()
 class RoleHandlerTest(TestCase):
     """
     Unit Test of REST interface to make sure correct status codes are returned
-    Patch the Rabbit connection to fake dispatch
     """
+
+    is_master = None
 
     def setUp(self):
         # TODO: Pull out all the common POST code into setup
@@ -71,6 +72,7 @@ class RoleHandlerTest(TestCase):
             conn = Connection(['mongodb.kbase.us'])
 
         db=conn.authorization
+        self.is_slave = conn.is_primary
         self.roles = db.roles
         self.testdata = { "role_updater": ["sychan","kbauthorz"],
                           "description": "Steve's test role",
@@ -353,7 +355,8 @@ class RoleHandlerTest(TestCase):
 
         # try without auth, should fail
         resp = h.put( url_roleid, jdata, content_type="application/json")
-        #print "resp.content = %s" % pp.pformat( resp.content)
+        print "resp.status_code = %s" % pp.pformat( resp.status_code)
+        print "resp.content = %s" % pp.pformat( resp.content)
         self.assertEqual(resp.status_code, 401, "Should reject update without auth token")
 
         # try with non kbase auth, should fail
