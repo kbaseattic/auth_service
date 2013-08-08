@@ -80,6 +80,7 @@ import copy
 import logging
 from jsonschema import validate
 from pymongo import Connection
+from pymongo.read_preferences import ReadPreference
 from piston.resource import Resource
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -98,7 +99,7 @@ class RoleHandler( BaseHandler):
     # We need to define the appropriate settings and set them here
     try:
         print "Connecting to %s" % settings.MONGODB_CONN
-        conn = Connection(settings.MONGODB_CONN)
+        conn = Connection(settings.MONGODB_CONN, read_preference = ReadPreference.PRIMARY_PREFERRED, safe=True)
     except AttributeError as e:
         logging.info("No connection settings specified: %s. Connecting to default mongodb service" % e)
         conn = Connection(['mongodb.kbase.us'])
