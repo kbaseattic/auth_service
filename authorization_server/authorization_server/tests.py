@@ -75,7 +75,6 @@ class RoleHandlerTest(TestCase):
             conn = Connection(['mongodb.kbase.us'])
         global is_slave
         # If we're on a slave instance, set the is slave flag and then
-        # re-open the connection with a readpreference that allows slaves.
         if not conn.is_primary:
             is_slave = not conn.is_primary
         db=conn.authorization

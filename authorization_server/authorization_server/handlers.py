@@ -114,6 +114,7 @@ class RoleHandler( BaseHandler):
     else:
         # we are a slave, disallow POST, PUT, DELETE and only support GET
         allowed_methods = ('GET')
+        logging.warning("MongoDB is a read-only instance, no roles can be created, updated or deleted" )
     # Set the role_id to require for updates to the roles db
     try:
         kbase_users = settings.KBASE_USERS
