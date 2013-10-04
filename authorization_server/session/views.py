@@ -16,7 +16,7 @@ from django.conf import settings
 from nexus import Client
 from pymongo import Connection,ReadPreference
 from authorization_server.handlers import RoleHandler
-import xml.etree.ElementTree as ET
+#import xml.etree.ElementTree as ET
 
 # Authentication server
 
@@ -126,7 +126,8 @@ def get_profile(token):
         return profile2
     logging.error( body)
     if int(res.status) == 401 or int(res.status) == 403:
-        raise AuthFailure( "Error fetching profile with token - %s" % ET.fromstring(body).find("title").text)
+        raise AuthFailure( "Invalid token")
+        #raise AuthFailure( "Error fetching profile with token - %s" % ET.fromstring(body).find("title").text)
     else:
         raise Exception("HTTP", res)
 

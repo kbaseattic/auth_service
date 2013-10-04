@@ -174,6 +174,9 @@ LOGGING = {
 # Force the default base_url to be the one used by the front end kbase proxy
 PROXY_BASEURL = "https://kbase.us/services/authorization"
 
+# New Django 1.5 thing
+ALLOWED_HOSTS = ['*']
+
 try:
     from local_settings import *
 except ImportError, exp:
