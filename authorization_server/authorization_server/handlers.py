@@ -81,6 +81,7 @@ import logging
 import common
 from jsonschema import validate
 from pymongo import Connection
+from pymongo.read_preferences import ReadPreference
 from piston.resource import Resource
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -98,7 +99,8 @@ class RoleHandler( BaseHandler):
     exclude = []
     # We need to define the appropriate settings and set them here
     try:
-        conn = Connection(settings.MONGODB_CONN)
+        print "Connecting to %s" % settings.MONGODB_CONN
+        conn = Connection(settings.MONGODB_CONN, read_preference = ReadPreference.PRIMARY_PREFERRED, safe=True)
     except AttributeError as e:
         logging.info("No connection settings specified: %s. Connecting to default mongodb service" % e)
         conn = Connection(['mongodb.kbase.us'])
@@ -107,8 +109,13 @@ class RoleHandler( BaseHandler):
         conn = Connection(['mongodb.kbase.us'])
     db = conn.authorization
     roles = db.roles
-    roles.ensure_index( 'role_id', unique=True )
-    roles.ensure_index( 'members' )
+    if conn.is_primary:
+        roles.ensure_index( 'role_id', unique=True )
+        roles.ensure_index( 'members' )
+    else:
+        # we are a slave, disallow POST, PUT, DELETE and only support GET
+        allowed_methods = ('GET')
+        logging.warning("MongoDB is a read-only instance, no roles can be created, updated or deleted" )
     # Set the role_id to require for updates to the roles db
     try:
         kbase_users = settings.KBASE_USERS

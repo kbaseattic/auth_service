@@ -17,7 +17,7 @@ from django.conf import settings
 from nexus import Client
 from pymongo import Connection,ReadPreference
 from authorization_server.handlers import RoleHandler
-import xml.etree.ElementTree as ET
+#import xml.etree.ElementTree as ET
 
 # Version of this service
 version = "0.9.0"
@@ -57,8 +57,10 @@ pp = pprint.PrettyPrinter(indent=4)
 cookie_re = re.compile(r"un=(\w+)\|kbase_sessionid=(\w+)")
 
 # Setup MongoDB connection
+# Are we attached to a read-only mongo instance?
+is_slave = False
 try:
-    conn = Connection(settings.MONGODB_CONN)
+    conn = Connection(settings.MONGODB_CONN,safe=True)
 except AttributeError as e:
     logging.info("No connection settings specified: %s. Using default mongodb." % e)
     conn = Connection(['mongodb.kbase.us'])
@@ -68,7 +70,11 @@ except Exception as e:
 db = conn.authorization
 db.read_preference = ReadPreference.PRIMARY_PREFERRED
 sessiondb = db.sessions
-sessiondb.ensure_index('kbase_sessionid')
+if conn.is_primary:
+    sessiondb.ensure_index('kbase_sessionid')
+else:
+    is_slave = True
+    logging.warning("MongoDB instance is read-only - no kbase_sessionid can be issued")
 
 # Default session lifetime in seconds from settings file
 # otherwise default to 1 hour
@@ -104,6 +110,9 @@ all_fields = ",".join([ '\'%s\'' % x for x in tmp])
 class AuthFailure( Exception ):
     pass
 
+class GlobusFailure( Exception ):
+    pass
+
 def get_profile(token):
     token_map = {}
     for entry in token.split('|'):
@@ -121,7 +130,7 @@ def get_profile(token):
         return profile2
     logging.error( body)
     if int(res.status) == 401 or int(res.status) == 403:
-        raise AuthFailure( "Unable to fetch profile using token")
+        raise AuthFailure( "Invalid token")
     else:
         raise Exception("HTTP", res)
 
@@ -135,13 +144,14 @@ def get_nexus_token( url, user_id, password):
     
     resp, content = h.request(url, 'GET', headers=headers)
     status = int(resp['status'])
-    tok = json.loads(content)
     if status>=200 and status<=299:
+        tok = json.loads(content)
         return tok['access_token']
     elif status == 401 or status == 403:
+        tok = json.loads(content)
         raise AuthFailure( "%s" % tok['message'])
     else:
-        raise Exception(tok['message'])
+        raise GlobusFailure( "%s:%s %s" % (resp.status,resp.reason,content))
 
 def current_datetime(request):
     now = datetime.now()
@@ -202,7 +212,8 @@ def exists(request):
                 response['error_msg'] = "No session found"
                 retcode = 404
         # Expire old sessions
-        sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
+        if not is_slave:
+            sessiondb.remove( { 'expiration' : { '$lte' : datetime.now() }})
     except Exception, e:
         error = "Error checking existence of session: %s" % e
         logging.error( error)
@@ -225,19 +236,22 @@ def logout(request):
             client_ip = x_forwarded_for.split(',')[-1].strip()
         else:
             client_ip = request.META.get('REMOTE_ADDR')
-        res = sessiondb.find_one( { 'kbase_sessionid' : kbase_sessionid,
-                                    'client_ip' : client_ip,
-                                    'username' : username })
-        if res is not None:
-            sessiondb.remove( res)
-            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
-                                    mimetype="application/json")
-            cookie = "un=%s|kbase_sessionid=%s" % (username,kbase_sessionid)
-            HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us", path="/",expires='Thu, 01 Jan 1970 00:00:01 GMT')
+        if not is_slave:
+            res = sessiondb.find_one( { 'kbase_sessionid' : kbase_sessionid,
+                                        'client_ip' : client_ip,
+                                        'username' : username })
+            if res is not None:
+                sessiondb.remove( res)
+                HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s deleted' % kbase_sessionid }),
+                                        mimetype="application/json")
+                cookie = "un=%s|kbase_sessionid=%s" % (username,kbase_sessionid)
+                HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us", path="/",expires='Thu, 01 Jan 1970 00:00:01 GMT')
 
+            else:
+                HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s not found' % kbase_sessionid }),
+                                        mimetype="application/json",status=404)
         else:
-            HTTPres = HttpResponse( json.dumps({ 'message' : 'session %s not found' % kbase_sessionid }),
-                                    mimetype="application/json",status=404)
+            raise Exception( 'database is in read-only mode, cannot expire session');
     except Exception, e:
         HTTPres = HttpResponse( json.dumps({ 'error_msg' : "%s" % e}),
                                 mimetype="application/json",status=400)
@@ -258,6 +272,9 @@ def login(request):
         # Session lifetime for mongodb sessions. Default set in settings file
         lifetime = request.POST.get('lifetime',session_lifetime)
         fields = request.POST.get('fields',default_fields)
+        fieldset = set(fields.split(","))
+        if is_slave and "kbase_sessionid" in fieldset:
+            raise Exception( "Database is read-only slave, cannot issue new kbase_sessionid")
         if (token is not None or (response['user_id'] is not None and password is not None)):
             if not token:
                 url = authsvc + "goauth/token?grant_type=client_credentials"
@@ -305,11 +322,14 @@ def login(request):
             cookie = "un=%s|kbase_sessionid=%s" % (sessiondoc['user_id'],sessiondoc['kbase_sessionid'])
             HTTPres.set_cookie( 'kbase_session', cookie,domain=".kbase.us")
     except AuthFailure, a:
-        response['error_msg'] = "%s" % a
+        response['error_msg'] = "LoginFailure: %s" % a
+        HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 401)
+    except GlobusFailure, a:
+        response['error_msg'] = "ConnectionFailure: %s" % a
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 401)
     except Exception, e:
         if type(e).__name__ != "Exception" :
-            response['error_msg'] = "%s e: %s" % (type(e).__name__,e)
+            response['error_msg'] = "%s: %s" % (type(e).__name__,e)
         else:
             response['error_msg'] = "Exception: %s" % e
         HTTPres = HttpResponse(json.dumps(response), mimetype="application/json", status = 500)

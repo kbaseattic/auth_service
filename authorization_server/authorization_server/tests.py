@@ -7,8 +7,10 @@ Replace this with more appropriate tests for your application.
 
 from django.test import TestCase
 from django.conf import settings
+from django.utils import unittest
 from nexus import Client
 from pymongo import Connection
+from pymongo.read_preferences import ReadPreference
 from authorization_server.handlers import RoleHandler
 import pprint
 import json
@@ -53,23 +55,28 @@ pp = pprint.PrettyPrinter(indent=4)
 # Pull in RoleHandler so we can call the dedupe function
 rh = RoleHandler()
 
+# flag for whether the mongodb instance is a slave instance
+is_slave = None
+
 class RoleHandlerTest(TestCase):
     """
     Unit Test of REST interface to make sure correct status codes are returned
-    Patch the Rabbit connection to fake dispatch
     """
 
     def setUp(self):
         # TODO: Pull out all the common POST code into setup
         try:
-            conn = Connection(settings.MONGODB_CONN)
+            conn = Connection(settings.MONGODB_CONN, read_preference = ReadPreference.PRIMARY_PREFERRED,safe=True)
         except AttributeError as e:
             print "No connection settings specified: %s\n" % e
             conn = Connection(['mongodb.kbase.us'])
         except Exception as e:
             print "Generic exception %s: %s\n" % (type(e),e)
             conn = Connection(['mongodb.kbase.us'])
-
+        global is_slave
+        # If we're on a slave instance, set the is slave flag and then
+        if not conn.is_primary:
+            is_slave = not conn.is_primary
         db=conn.authorization
         self.roles = db.roles
         self.testdata = { "role_updater": ["sychan","kbauthorz"],
@@ -88,7 +95,8 @@ class RoleHandlerTest(TestCase):
                           }
         self.test_docid = "doc_" + "".join(random.sample(charset,10))
         # clear out any cruft from previous unittest runs
-        self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
+        if not is_slave:
+            self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
         # insert a test record for unittesting
         testdata=dict(self.testdata)
         testdata['role_id'] += "".join(random.sample(charset,10))
@@ -98,14 +106,17 @@ class RoleHandlerTest(TestCase):
         testdata['modify'] = [self.test_docid]
         testdata['create'] = [self.test_docid]
         testdata['owns'] = [self.test_docid]
-        self.roles.insert( testdata)
+        if not is_slave:
+            self.roles.insert( testdata)
 
     def tearDown(self):
         # clear out any cruft from current unittest run
-        self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
-
+        if not is_slave:
+            self.roles.remove( { 'role_id' : { '$regex' : 'unittest.*' } } )
 
     def testCreate(self):
+        if is_slave:
+            raise unittest.SkipTest("MongoDB db is a slave instance, cannot test creation")
         h = self.client
         url = "/Roles/"
         authstatus = "/authstatus/"
@@ -237,6 +248,7 @@ class RoleHandlerTest(TestCase):
         self.assertIsNotNone(usage, "Expecting usage message")
 
         resp = h.get(url, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
+        #print "Response from query was: %s %s" % (resp.status_code, resp.content)
         self.assertEqual(resp.status_code, 200, "Should accept queries from legit kbase test user")
         respjson = json.loads(resp.content)
         self.assertIn("kbase_users",respjson, "Expecting usage message")
@@ -310,12 +322,14 @@ class RoleHandlerTest(TestCase):
         self.assertEquals( role_ids, role_idsdb, "Should get identical results from pymongo query and user_id=kbasetest query")
 
         # Perform query using the doc_id param and verify against sample doc_id
-        url2 = "%s?doc_id=%s" % (url,self.test_docid)
-        resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
-        self.assertEqual(resp.status_code, 200, "Querying for roles with doc_id=%s using GET param" % self.test_docid)
-        respjson = json.loads(resp.content)
-        self.assertTrue( len(respjson) == 1, "Should get single result matching random doc_id from test suite")
-        self.assertEquals( respjson[0]['role_id'], self.test_role_id, "Should get matching role_ids for doc_id query")
+        # skip if we are on a slave mongodb
+        if not is_slave:
+            url2 = "%s?doc_id=%s" % (url,self.test_docid)
+            resp = h.get(url2, {}, HTTP_AUTHORIZATION="OAuth %s" % kbusertoken)
+            self.assertEqual(resp.status_code, 200, "Querying for roles with doc_id=%s using GET param" % self.test_docid)
+            respjson = json.loads(resp.content)
+            self.assertTrue( len(respjson) == 1, "Should get single result matching random doc_id from test suite")
+            self.assertEquals( respjson[0]['role_id'], self.test_role_id, "Should get matching role_ids for doc_id query")
 
         # Perform query using the union and user_id parameters and verify against mongodb
         url2 = "%s?user_id=kbasetest&union=" % url
@@ -335,6 +349,8 @@ class RoleHandlerTest(TestCase):
             self.assertTrue( merged[acls] == set(respjson[0][acls]), "Should get identical %s ACL from pymongo and user_id=kbasetest&union= query" % acls)
 
     def testUpdate(self):
+        if is_slave:
+            raise unittest.SkipTest("MongoDB db is a slave instance, cannot test updates")
         h = self.client
         url = "/Roles/"
 
@@ -353,6 +369,7 @@ class RoleHandlerTest(TestCase):
 
         # try without auth, should fail
         resp = h.put( url_roleid, jdata, content_type="application/json")
+        #print "resp.status_code = %s" % pp.pformat( resp.status_code)
         #print "resp.content = %s" % pp.pformat( resp.content)
         self.assertEqual(resp.status_code, 401, "Should reject update without auth token")
 
@@ -465,6 +482,8 @@ class RoleHandlerTest(TestCase):
         self.roles.remove( { '_id' : id }, safe=True)
         
     def testDelete(self):
+        if is_slave:
+            raise unittest.SkipTest("MongoDB db is a slave instance, cannot test deletion")
         h = self.client
         url = "/Roles/"
         testdata = dict(self.testdata)
