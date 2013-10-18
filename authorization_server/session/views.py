@@ -121,7 +121,7 @@ def get_profile(token):
         return profile2
     logging.error( body)
     if int(res.status) == 401 or int(res.status) == 403:
-        raise AuthFailure( "Error fetching profile with token - %s" % ET.fromstring(body).find("title").text)
+        raise AuthFailure( "Unable to fetch profile using token")
     else:
         raise Exception("HTTP", res)
 
