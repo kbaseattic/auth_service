@@ -174,7 +174,9 @@ LOGGING = {
 # Force the default base_url to be the one used by the front end kbase proxy
 PROXY_BASEURL = "https://kbase.us/services/authorization"
 
-# New Django 1.5 thing
+# Setup the allowed hosts stuff for django >= v1.5
+# We won't be embedding the links anywhere that include the HTTP_HOST variable,
+# so I think this protection doesn't need to apply to us - sychan 10/19/2013
 ALLOWED_HOSTS = ['*']
 
 try:
