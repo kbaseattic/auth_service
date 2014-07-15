@@ -1,9 +1,17 @@
 import os
 import django
+import ConfigParser
+
 
 # Setup filesystem locations for current installation
 DJANGO_ROOT = os.path.dirname(os.path.realpath(django.__file__))
 (SITE_ROOT,dummy) = os.path.split(os.path.dirname(os.path.realpath(__file__)))
+
+
+kb_deployment_config = os.getenv('KB_DEPLOYMENT_CONFIG', './deploy.cfg' )
+
+CONFIG = ConfigParser.ConfigParser()
+CONFIG.read(kb_deployment_config)
 
 # Django settings for authorization_server project.
 
@@ -178,6 +186,9 @@ PROXY_BASEURL = "https://kbase.us/services/authorization"
 # We won't be embedding the links anywhere that include the HTTP_HOST variable,
 # so I think this protection doesn't need to apply to us - sychan 10/19/2013
 ALLOWED_HOSTS = ['*']
+
+MONGODB_CONN = CONFIG.get('authorization', 'mongodb-host')
+
 
 try:
     from local_settings import *
