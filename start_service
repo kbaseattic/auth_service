@@ -6,8 +6,9 @@ BASE=$(echo $0|sed 's/[^/]*$//')
 cd $BASE
 
 # TODO: Handle this better
-if [ -e "$KB_TOP/deployement.cfg" ] ; then
-  export KB_DEPLOYMENT_CONFIG=$KB_TOP/deployment.cfg
+if [ -e "../../deployment.cfg" ] ; then
+  P=$(pwd) 
+  export KB_DEPLOYMENT_CONFIG=$P/../../deployment.cfg
 fi
 
 # Keep the configs for things in the django.conf file
