@@ -187,8 +187,10 @@ PROXY_BASEURL = "https://kbase.us/services/authorization"
 # so I think this protection doesn't need to apply to us - sychan 10/19/2013
 ALLOWED_HOSTS = ['*']
 
-MONGODB_CONN = CONFIG.get('authorization', 'mongodb-host')
-
+try:
+    MONGODB_CONN = CONFIG.get('authorization', 'mongodb-host')
+except:
+    pass
 
 try:
     from local_settings import *
