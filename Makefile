@@ -45,6 +45,9 @@ deploy-docs:
 	mkdir -p $(SERVICE_DIR)/webroot
 	cp docs/*html $(SERVICE_DIR)/webroot/.
 
+deploy-client:
+	echo "No clients.  Use auth."
+
 build-docs:
 	curl -o docs/auth_service.html $(DOCURL)
 
